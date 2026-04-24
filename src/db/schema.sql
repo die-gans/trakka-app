@@ -55,20 +55,6 @@ CREATE TABLE public.trips (
 );
 
 -- ============================================
--- TRIP MEMBERS (links users to trips with roles)
--- ============================================
-CREATE TABLE public.trip_members (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-  trip_id uuid REFERENCES public.trips(id) ON DELETE CASCADE,
-  user_id uuid REFERENCES public.users(id) ON DELETE CASCADE,
-  family_id uuid REFERENCES public.families(id) ON DELETE SET NULL,
-  role text DEFAULT 'member' CHECK (role IN ('organizer', 'member')),
-  permission text DEFAULT 'editor' CHECK (permission IN ('viewer', 'editor')),
-  joined_at timestamptz DEFAULT now(),
-  UNIQUE(trip_id, user_id)
-);
-
--- ============================================
 -- FAMILIES (units/crews within a trip)
 -- ============================================
 CREATE TABLE public.families (
@@ -88,6 +74,20 @@ CREATE TABLE public.families (
   readiness int DEFAULT 0 CHECK (readiness >= 0 AND readiness <= 100),
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
+);
+
+-- ============================================
+-- TRIP MEMBERS (links users to trips with roles)
+-- ============================================
+CREATE TABLE public.trip_members (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  trip_id uuid REFERENCES public.trips(id) ON DELETE CASCADE,
+  user_id uuid REFERENCES public.users(id) ON DELETE CASCADE,
+  family_id uuid REFERENCES public.families(id) ON DELETE SET NULL,
+  role text DEFAULT 'member' CHECK (role IN ('organizer', 'member')),
+  permission text DEFAULT 'editor' CHECK (permission IN ('viewer', 'editor')),
+  joined_at timestamptz DEFAULT now(),
+  UNIQUE(trip_id, user_id)
 );
 
 -- ============================================
