@@ -16,11 +16,26 @@ import {
   useTripPermission,
   useTripMembers,
   useLocations,
+  useItineraryItems,
 } from '../hooks/useTripData'
-import { DAYS } from '../data/seedTrip'
+import { DAYS, TIME_SLOTS } from '../data/seedTrip'
 import { signOut } from '../lib/supabase'
 import { cn } from '../lib/utils'
-import { createTask, updateMeal, updateTask, updateExpense } from '../lib/supabase-crud'
+import {
+  createTask,
+  updateMeal,
+  updateTask,
+  updateExpense,
+  createMeal,
+  createExpense,
+  deleteMeal,
+  deleteTask,
+  deleteExpense,
+  createItineraryItem,
+  updateItineraryItem,
+  deleteItineraryItem,
+} from '../lib/supabase-crud'
+import { Plus, Trash2, Pencil, X } from 'lucide-react'
 
 function EmptyState({ title, subtitle }) {
   return (
@@ -31,6 +46,63 @@ function EmptyState({ title, subtitle }) {
   )
 }
 
+/* ─── Inline Modal ─── */
+function InlineModal({ open, onClose, title, children }) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg-base/80 p-4">
+      <div className="w-full max-w-md border border-border-default bg-bg-surface shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border-default bg-bg-panel px-4 py-3">
+          <h3 className="text-[12px] font-black uppercase tracking-[0.12em] text-text-primary">{title}</h3>
+          <button onClick={onClose} className="text-text-secondary hover:text-text-primary">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-4">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function FormField({ label, children }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-text-secondary">
+        {label}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+function TextInput({ value, onChange, placeholder, type = 'text' }) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      className="w-full border border-border-default bg-bg-base px-3 py-2 text-[12px] text-text-primary outline-none focus:border-info"
+    />
+  )
+}
+
+function SelectField({ value, onChange, options, placeholder }) {
+  return (
+    <select
+      value={value}
+      onChange={onChange}
+      className="w-full border border-border-default bg-bg-base px-3 py-2 text-[12px] text-text-primary outline-none focus:border-info"
+    >
+      {placeholder && <option value="">{placeholder}</option>}
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value}>{opt.label}</option>
+      ))}
+    </select>
+  )
+}
+
+/* ─── Families View ─── */
 function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness, onSelectEntity, isEditor }) {
   if (loading) {
     return (
@@ -153,7 +225,51 @@ function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness,
   )
 }
 
-function MealsView({ meals, loading, onUpdateStatus, onSelectEntity, isEditor }) {
+/* ─── Meals View with CRUD ─── */
+function MealsView({ tripId, meals, loading, onUpdateStatus, onSelectEntity, isEditor, onCreate, onDelete }) {
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [form, setForm] = useState({ meal: '', day_id: 'thu', owner: '', status: 'Pending', note: '' })
+
+  const days = [
+    { value: 'thu', label: 'Thu' },
+    { value: 'fri', label: 'Fri' },
+    { value: 'sat', label: 'Sat' },
+    { value: 'sun', label: 'Sun' },
+  ]
+
+  const openAdd = () => {
+    setEditing(null)
+    setForm({ meal: '', day_id: 'thu', owner: '', status: 'Pending', note: '' })
+    setModalOpen(true)
+  }
+
+  const openEdit = (meal) => {
+    setEditing(meal)
+    setForm({
+      meal: meal.meal || '',
+      day_id: meal.day_id || 'thu',
+      owner: meal.owner || '',
+      status: meal.status || 'Pending',
+      note: meal.note || '',
+    })
+    setModalOpen(true)
+  }
+
+  const handleSubmit = async () => {
+    if (!form.meal.trim()) return
+    try {
+      if (editing) {
+        await updateMeal(editing.id, form)
+      } else {
+        await onCreate({ ...form, trip_id: tripId })
+      }
+      setModalOpen(false)
+    } catch (err) {
+      console.error('Failed to save meal:', err)
+    }
+  }
+
   if (loading) {
     return (
       <div className="p-6">
@@ -163,64 +279,176 @@ function MealsView({ meals, loading, onUpdateStatus, onSelectEntity, isEditor })
     )
   }
 
-  if (meals.length === 0) {
-    return (
-      <div className="p-6">
-        <SectionTitle eyebrow="Logistics" title="Meal Plan" meta="0 meals" />
-        <div className="mt-4">
-          <EmptyState title="No Meals" subtitle="Meals will appear here once added" />
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="p-6">
-      <SectionTitle eyebrow="Logistics" title="Meal Plan" meta={`${meals.length} meals`} />
-      <div className="grid gap-2">
-        {meals.map((meal) => (
+      <div className="flex items-center justify-between">
+        <SectionTitle eyebrow="Logistics" title="Meal Plan" meta={`${meals.length} meals`} />
+        {isEditor && (
           <button
-            key={meal.id}
-            onClick={() => onSelectEntity('meal', meal)}
-            className="flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3 text-left transition-colors hover:border-info/40 hover:bg-bg-panel"
+            onClick={openAdd}
+            className="flex items-center gap-1 border border-info bg-info-soft px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-info transition-colors hover:bg-info/20"
           >
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-wider text-text-secondary">
-                {meal.day_id?.toUpperCase()}
-              </div>
-              <div className="text-[13px] font-bold text-text-primary">
-                {meal.meal}
-              </div>
-              {meal.note && (
-                <div className="mt-0.5 text-[10px] text-text-secondary">
-                  {meal.note}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-[10px] font-bold text-text-secondary">
-                {meal.owner}
-              </div>
-              <button
-                disabled={!isEditor}
-                onClick={() => {
-                  const statuses = ['Pending', 'Assigned', 'Settled']
-                  const nextStatus = statuses[(statuses.indexOf(meal.status) + 1) % statuses.length]
-                  onUpdateStatus(meal.id, nextStatus)
-                }}
-                className={cn(!isEditor && 'cursor-default opacity-60')}
-              >
-                <StatusPill tone={meal.status}>{meal.status}</StatusPill>
-              </button>
-            </div>
+            <Plus size={12} /> Add
           </button>
-        ))}
+        )}
       </div>
+
+      {meals.length === 0 ? (
+        <div className="mt-4">
+          <EmptyState title="No Meals" subtitle="Add meals to plan your trip logistics" />
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-2">
+          {meals.map((meal) => (
+            <div
+              key={meal.id}
+              className="group flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3 transition-colors hover:border-info/40 hover:bg-bg-panel"
+            >
+              <button
+                onClick={() => onSelectEntity('meal', meal)}
+                className="flex-1 text-left"
+              >
+                <div className="text-[10px] font-black uppercase tracking-wider text-text-secondary">
+                  {meal.day_id?.toUpperCase()}
+                </div>
+                <div className="text-[13px] font-bold text-text-primary">
+                  {meal.meal}
+                </div>
+                {meal.note && (
+                  <div className="mt-0.5 text-[10px] text-text-secondary">
+                    {meal.note}
+                  </div>
+                )}
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="text-[10px] font-bold text-text-secondary">
+                  {meal.owner}
+                </div>
+                <button
+                  disabled={!isEditor}
+                  onClick={() => {
+                    const statuses = ['Pending', 'Assigned', 'Settled']
+                    const nextStatus = statuses[(statuses.indexOf(meal.status) + 1) % statuses.length]
+                    onUpdateStatus(meal.id, nextStatus)
+                  }}
+                  className={cn(!isEditor && 'cursor-default opacity-60')}
+                >
+                  <StatusPill tone={meal.status}>{meal.status}</StatusPill>
+                </button>
+                {isEditor && (
+                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button onClick={() => openEdit(meal)} className="p-1 text-text-secondary hover:text-info">
+                      <Pencil size={13} />
+                    </button>
+                    <button onClick={() => onDelete(meal.id)} className="p-1 text-text-secondary hover:text-critical">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <InlineModal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Meal' : 'Add Meal'}>
+        <div className="space-y-3">
+          <FormField label="Meal">
+            <TextInput value={form.meal} onChange={(e) => setForm({ ...form, meal: e.target.value })} placeholder="e.g. Beach picnic" />
+          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Day">
+              <SelectField value={form.day_id} onChange={(e) => setForm({ ...form, day_id: e.target.value })} options={days} />
+            </FormField>
+            <FormField label="Status">
+              <SelectField
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value })}
+                options={[
+                  { value: 'Pending', label: 'Pending' },
+                  { value: 'Assigned', label: 'Assigned' },
+                  { value: 'Settled', label: 'Settled' },
+                ]}
+              />
+            </FormField>
+          </div>
+          <FormField label="Owner">
+            <TextInput value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })} placeholder="e.g. Sydney Crew" />
+          </FormField>
+          <FormField label="Note">
+            <textarea
+              value={form.note}
+              onChange={(e) => setForm({ ...form, note: e.target.value })}
+              placeholder="Optional note..."
+              rows={3}
+              className="w-full resize-none border border-border-default bg-bg-base px-3 py-2 text-[12px] text-text-primary outline-none focus:border-info"
+            />
+          </FormField>
+          <div className="flex justify-end gap-2 pt-2">
+            <button onClick={() => setModalOpen(false)} className="border border-border-default bg-bg-panel px-4 py-2 text-[11px] font-black uppercase tracking-wider text-text-secondary hover:text-text-primary">
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!form.meal.trim()}
+              className={cn(
+                'border px-4 py-2 text-[11px] font-black uppercase tracking-wider',
+                form.meal.trim() ? 'border-success bg-success-soft text-success hover:bg-success/20' : 'cursor-not-allowed border-border-default bg-bg-panel text-text-muted'
+              )}
+            >
+              {editing ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </div>
+      </InlineModal>
     </div>
   )
 }
 
-function TasksView({ tasks, loading, onToggleStatus, onSelectEntity, isEditor }) {
+/* ─── Tasks View with CRUD ─── */
+function TasksView({ tripId, tasks, loading, onToggleStatus, onSelectEntity, isEditor, onCreate, onDelete }) {
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [form, setForm] = useState({ title: '', day_id: 'thu', status: 'open', assigned_family_id: '' })
+
+  const days = [
+    { value: 'thu', label: 'Thu' },
+    { value: 'fri', label: 'Fri' },
+    { value: 'sat', label: 'Sat' },
+    { value: 'sun', label: 'Sun' },
+  ]
+
+  const openAdd = () => {
+    setEditing(null)
+    setForm({ title: '', day_id: 'thu', status: 'open', assigned_family_id: '' })
+    setModalOpen(true)
+  }
+
+  const openEdit = (task) => {
+    setEditing(task)
+    setForm({
+      title: task.title || '',
+      day_id: task.day_id || 'thu',
+      status: task.status || 'open',
+      assigned_family_id: task.assigned_family_id || '',
+    })
+    setModalOpen(true)
+  }
+
+  const handleSubmit = async () => {
+    if (!form.title.trim()) return
+    try {
+      if (editing) {
+        await updateTask(editing.id, form)
+      } else {
+        await onCreate({ ...form, trip_id: tripId })
+      }
+      setModalOpen(false)
+    } catch (err) {
+      console.error('Failed to save task:', err)
+    }
+  }
+
   if (loading) {
     return (
       <div className="p-6">
@@ -230,73 +458,402 @@ function TasksView({ tasks, loading, onToggleStatus, onSelectEntity, isEditor })
     )
   }
 
-  if (tasks.length === 0) {
-    return (
-      <div className="p-6">
-        <SectionTitle eyebrow="Operations" title="Task Board" meta="0 tasks" />
-        <div className="mt-4">
-          <EmptyState title="No Tasks" subtitle="Tasks will appear here once added" />
-        </div>
-      </div>
-    )
-  }
-
   const pending = tasks.filter((t) => t.status !== 'done')
   const done = tasks.filter((t) => t.status === 'done')
 
   return (
     <div className="p-6">
-      <SectionTitle eyebrow="Operations" title="Task Board" meta={`${pending.length} open · ${done.length} done`} />
-      <div className="grid gap-2">
-        {tasks.map((task) => (
-          <div
-            key={task.id}
-            onClick={() => onSelectEntity('task', task)}
-            className="flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3 text-left transition-colors hover:border-info/40 hover:bg-bg-panel cursor-pointer"
+      <div className="flex items-center justify-between">
+        <SectionTitle eyebrow="Operations" title="Task Board" meta={`${pending.length} open · ${done.length} done`} />
+        {isEditor && (
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-1 border border-info bg-info-soft px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-info transition-colors hover:bg-info/20"
           >
-            <div className="flex items-center gap-3">
-              <button
-                disabled={!isEditor}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onToggleStatus(task.id, task.status)
-                }}
-                className={cn(
-                  'h-4 w-4 border flex items-center justify-center',
-                  !isEditor && 'cursor-default opacity-60',
-                  task.status === 'done'
-                    ? 'border-success bg-success-soft text-success'
-                    : 'border-border-default bg-bg-panel'
+            <Plus size={12} /> Add
+          </button>
+        )}
+      </div>
+
+      {tasks.length === 0 ? (
+        <div className="mt-4">
+          <EmptyState title="No Tasks" subtitle="Add tasks to track operations" />
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-2">
+          {tasks.map((task) => (
+            <div
+              key={task.id}
+              className="group flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3 transition-colors hover:border-info/40 hover:bg-bg-panel"
+            >
+              <div className="flex items-center gap-3">
+                <button
+                  disabled={!isEditor}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleStatus(task.id, task.status)
+                  }}
+                  className={cn(
+                    'h-4 w-4 border flex items-center justify-center',
+                    !isEditor && 'cursor-default opacity-60',
+                    task.status === 'done'
+                      ? 'border-success bg-success-soft text-success'
+                      : 'border-border-default bg-bg-panel'
+                  )}
+                >
+                  {task.status === 'done' && '✓'}
+                </button>
+                <button onClick={() => onSelectEntity('task', task)} className="text-left">
+                  <div className={cn(
+                    'text-[12px] font-bold',
+                    task.status === 'done' ? 'text-text-secondary line-through' : 'text-text-primary'
+                  )}>
+                    {task.title}
+                  </div>
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-text-secondary">
+                    {task.day_id?.toUpperCase()} · {task.assigned_family_id ? 'Assigned' : 'Unassigned'}
+                  </div>
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusPill tone={task.status === 'done' ? 'done' : 'open'}>
+                  {task.status === 'done' ? 'Done' : 'Open'}
+                </StatusPill>
+                {isEditor && (
+                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button onClick={() => openEdit(task)} className="p-1 text-text-secondary hover:text-info">
+                      <Pencil size={13} />
+                    </button>
+                    <button onClick={() => onDelete(task.id)} className="p-1 text-text-secondary hover:text-critical">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 )}
-              >
-                {task.status === 'done' && '✓'}
-              </button>
-              <div>
-                <div className={cn(
-                  'text-[12px] font-bold',
-                  task.status === 'done' ? 'text-text-secondary line-through' : 'text-text-primary'
-                )}>
-                  {task.title}
-                </div>
-                <div className="text-[9px] font-bold uppercase tracking-wider text-text-secondary">
-                  {task.day_id?.toUpperCase()} · {task.assigned_family_id ? 'Assigned' : 'Unassigned'}
-                </div>
               </div>
             </div>
-            <StatusPill tone={task.status === 'done' ? 'done' : 'open'}>
-              {task.status === 'done' ? 'Done' : 'Open'}
-            </StatusPill>
+          ))}
+        </div>
+      )}
+
+      <InlineModal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Task' : 'Add Task'}>
+        <div className="space-y-3">
+          <FormField label="Title">
+            <TextInput value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Pack BBQ kit" />
+          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Day">
+              <SelectField value={form.day_id} onChange={(e) => setForm({ ...form, day_id: e.target.value })} options={days} />
+            </FormField>
+            <FormField label="Status">
+              <SelectField
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value })}
+                options={[
+                  { value: 'open', label: 'Open' },
+                  { value: 'done', label: 'Done' },
+                  { value: 'blocked', label: 'Blocked' },
+                ]}
+              />
+            </FormField>
           </div>
-        ))}
-      </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button onClick={() => setModalOpen(false)} className="border border-border-default bg-bg-panel px-4 py-2 text-[11px] font-black uppercase tracking-wider text-text-secondary hover:text-text-primary">
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!form.title.trim()}
+              className={cn(
+                'border px-4 py-2 text-[11px] font-black uppercase tracking-wider',
+                form.title.trim() ? 'border-success bg-success-soft text-success hover:bg-success/20' : 'cursor-not-allowed border-border-default bg-bg-panel text-text-muted'
+              )}
+            >
+              {editing ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </div>
+      </InlineModal>
     </div>
   )
 }
 
-function ItineraryView({ days }) {
+/* ─── Expenses View with CRUD ─── */
+function ExpensesView({ tripId, expenses, loading, onSelectEntity, isEditor, onCreate, onDelete, families }) {
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [form, setForm] = useState({ title: '', amount: '', payer_family_id: '', allocation_mode: 'equal' })
+
+  const openAdd = () => {
+    setEditing(null)
+    setForm({ title: '', amount: '', payer_family_id: '', allocation_mode: 'equal' })
+    setModalOpen(true)
+  }
+
+  const openEdit = (expense) => {
+    setEditing(expense)
+    setForm({
+      title: expense.title || '',
+      amount: String(expense.amount || ''),
+      payer_family_id: expense.payer_family_id || '',
+      allocation_mode: expense.allocation_mode || 'equal',
+    })
+    setModalOpen(true)
+  }
+
+  const handleSubmit = async () => {
+    if (!form.title.trim() || !form.amount) return
+    try {
+      const payload = { ...form, amount: parseFloat(form.amount), trip_id: tripId }
+      if (editing) {
+        await updateExpense(editing.id, payload)
+      } else {
+        await onCreate(payload)
+      }
+      setModalOpen(false)
+    } catch (err) {
+      console.error('Failed to save expense:', err)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <SectionTitle eyebrow="Logistics" title="Expenses" />
+        <div className="mt-4 text-[11px] text-text-secondary">Loading expenses...</div>
+      </div>
+    )
+  }
+
+  const total = expenses.reduce((sum, e) => sum + (e.amount || 0), 0)
+
   return (
     <div className="p-6">
-      <SectionTitle eyebrow="Timeline" title="Mission Timeline" meta="4 days · 6-hour slots" />
+      <div className="flex items-center justify-between">
+        <SectionTitle eyebrow="Logistics" title="Expenses" meta={`$${total.toFixed(0)} total`} />
+        {isEditor && (
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-1 border border-info bg-info-soft px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-info transition-colors hover:bg-info/20"
+          >
+            <Plus size={12} /> Add
+          </button>
+        )}
+      </div>
+
+      {expenses.length === 0 ? (
+        <div className="mt-4">
+          <EmptyState title="No Expenses" subtitle="Add expenses to track shared costs" />
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-2">
+          {expenses.map((expense) => (
+            <div
+              key={expense.id}
+              className="group flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3 transition-colors hover:border-info/40 hover:bg-bg-panel"
+            >
+              <button onClick={() => onSelectEntity('expense', expense)} className="flex-1 text-left">
+                <div className="text-[13px] font-bold text-text-primary">
+                  {expense.title}
+                </div>
+                <div className="text-[10px] text-text-secondary">
+                  Paid by {expense.payer_family_id}
+                </div>
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="text-[14px] font-black text-text-primary">
+                  ${expense.amount?.toFixed(2)}
+                </div>
+                {isEditor && (
+                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button onClick={() => openEdit(expense)} className="p-1 text-text-secondary hover:text-info">
+                      <Pencil size={13} />
+                    </button>
+                    <button onClick={() => onDelete(expense.id)} className="p-1 text-text-secondary hover:text-critical">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <InlineModal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Expense' : 'Add Expense'}>
+        <div className="space-y-3">
+          <FormField label="Title">
+            <TextInput value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Accommodation" />
+          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Amount ($)">
+              <TextInput type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0.00" />
+            </FormField>
+            <FormField label="Payer">
+              <SelectField
+                value={form.payer_family_id}
+                onChange={(e) => setForm({ ...form, payer_family_id: e.target.value })}
+                placeholder="Select payer"
+                options={families.map((f) => ({ value: f.id, label: f.name }))}
+              />
+            </FormField>
+          </div>
+          <FormField label="Split">
+            <SelectField
+              value={form.allocation_mode}
+              onChange={(e) => setForm({ ...form, allocation_mode: e.target.value })}
+              options={[
+                { value: 'equal', label: 'Equal split' },
+                { value: 'manual', label: 'Manual split' },
+                { value: 'individual', label: 'Individual' },
+              ]}
+            />
+          </FormField>
+          <div className="flex justify-end gap-2 pt-2">
+            <button onClick={() => setModalOpen(false)} className="border border-border-default bg-bg-panel px-4 py-2 text-[11px] font-black uppercase tracking-wider text-text-secondary hover:text-text-primary">
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!form.title.trim() || !form.amount}
+              className={cn(
+                'border px-4 py-2 text-[11px] font-black uppercase tracking-wider',
+                form.title.trim() && form.amount ? 'border-success bg-success-soft text-success hover:bg-success/20' : 'cursor-not-allowed border-border-default bg-bg-panel text-text-muted'
+              )}
+            >
+              {editing ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </div>
+      </InlineModal>
+    </div>
+  )
+}
+
+/* ─── Itinerary View with CRUD ─── */
+function ItineraryView({ tripId, items, loading, isEditor, families, onRefresh }) {
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [form, setForm] = useState({ title: '', day_id: 'thu', row_id: 'activities', start_slot: '0', span: '1', color: 'info' })
+
+  const days = [
+    { value: 'thu', label: 'Thu 4/09' },
+    { value: 'fri', label: 'Fri 4/10' },
+    { value: 'sat', label: 'Sat 4/11' },
+    { value: 'sun', label: 'Sun 4/12' },
+  ]
+
+  const slots = [
+    { value: '0', label: '00:00' },
+    { value: '6', label: '06:00' },
+    { value: '12', label: '12:00' },
+    { value: '18', label: '18:00' },
+  ]
+
+  const colors = [
+    { value: 'info', label: 'Blue' },
+    { value: 'success', label: 'Green' },
+    { value: 'warning', label: 'Amber' },
+    { value: 'critical', label: 'Red' },
+  ]
+
+  const rows = [
+    { value: 'travel', label: 'Travel' },
+    { value: 'activities', label: 'Activities' },
+    { value: 'support', label: 'Support' },
+  ]
+
+  const openAdd = (dayId, slotValue) => {
+    setEditing(null)
+    setForm({
+      title: '',
+      day_id: dayId,
+      row_id: 'activities',
+      start_slot: String(slotValue),
+      span: '1',
+      color: 'info',
+    })
+    setModalOpen(true)
+  }
+
+  const openEdit = (item) => {
+    setEditing(item)
+    setForm({
+      title: item.title || '',
+      day_id: item.day_id || 'thu',
+      row_id: item.row_id || 'activities',
+      start_slot: String(item.start_slot || 0),
+      span: String(item.span || 1),
+      color: item.color || 'info',
+    })
+    setModalOpen(true)
+  }
+
+  const handleSubmit = async () => {
+    if (!form.title.trim()) return
+    try {
+      const payload = {
+        ...form,
+        start_slot: parseFloat(form.start_slot),
+        span: parseFloat(form.span),
+        trip_id: tripId,
+      }
+      if (editing) {
+        await updateItineraryItem(editing.id, payload)
+      } else {
+        await createItineraryItem(payload)
+      }
+      onRefresh()
+      setModalOpen(false)
+    } catch (err) {
+      console.error('Failed to save itinerary item:', err)
+    }
+  }
+
+  const handleDelete = async (id) => {
+    try {
+      await deleteItineraryItem(id)
+      onRefresh()
+    } catch (err) {
+      console.error('Failed to delete itinerary item:', err)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <SectionTitle eyebrow="Timeline" title="Mission Timeline" />
+        <div className="mt-4 text-[11px] text-text-secondary">Loading timeline...</div>
+      </div>
+    )
+  }
+
+  // Group items by day
+  const itemsByDay = {}
+  DAYS.forEach((d) => { itemsByDay[d.id] = [] })
+  items.forEach((item) => {
+    if (itemsByDay[item.day_id]) itemsByDay[item.day_id].push(item)
+  })
+
+  const colorClasses = {
+    info: 'border-info/40 bg-info-soft text-info',
+    success: 'border-success/40 bg-success-soft text-success',
+    warning: 'border-warning/40 bg-warning-soft text-warning',
+    critical: 'border-critical/40 bg-critical-soft text-critical',
+  }
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between">
+        <SectionTitle eyebrow="Timeline" title="Mission Timeline" meta="4 days · 6-hour slots" />
+        {isEditor && (
+          <button
+            onClick={() => openAdd('thu', 0)}
+            className="flex items-center gap-1 border border-info bg-info-soft px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-info transition-colors hover:bg-info/20"
+          >
+            <Plus size={12} /> Add Item
+          </button>
+        )}
+      </div>
 
       {/* Weather Widget */}
       <div className="mb-6">
@@ -308,7 +865,7 @@ function ItineraryView({ days }) {
       </div>
 
       <div className="grid gap-4">
-        {days.map((day) => (
+        {DAYS.map((day) => (
           <div key={day.id} className="border border-border-default bg-bg-surface">
             <div className="flex items-center justify-between border-b border-border-default bg-bg-panel px-4 py-2">
               <div className="flex items-center gap-3">
@@ -326,72 +883,117 @@ function ItineraryView({ days }) {
             </div>
             <div className="p-4">
               <div className="grid grid-cols-4 gap-2">
-                {['00:00', '06:00', '12:00', '18:00'].map((slot) => (
-                  <div key={slot} className="border border-border-default bg-bg-panel p-2">
-                    <div className="text-[9px] font-black uppercase tracking-wider text-text-secondary mb-1">
-                      {slot}
+                {TIME_SLOTS.map((slot, slotIdx) => {
+                  const slotValue = slotIdx * 6
+                  const slotItems = itemsByDay[day.id].filter(
+                    (item) => item.start_slot >= slotValue && item.start_slot < slotValue + 6
+                  )
+
+                  return (
+                    <div key={slot} className="border border-border-default bg-bg-panel p-2 min-h-[80px]">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="text-[9px] font-black uppercase tracking-wider text-text-secondary">
+                          {slot}:00
+                        </div>
+                        {isEditor && (
+                          <button
+                            onClick={() => openAdd(day.id, slotValue)}
+                            className="text-text-muted hover:text-info"
+                          >
+                            <Plus size={10} />
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        {slotItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className={cn(
+                              'group relative border px-2 py-1.5 text-[10px] font-bold',
+                              colorClasses[item.color] || colorClasses.info
+                            )}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="truncate">{item.title}</span>
+                              {isEditor && (
+                                <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                  <button onClick={() => openEdit(item)} className="hover:underline">
+                                    <Pencil size={9} />
+                                  </button>
+                                  <button onClick={() => handleDelete(item.id)} className="hover:underline">
+                                    <Trash2 size={9} />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-[8px] opacity-70 mt-0.5">
+                              {item.row_id}
+                            </div>
+                          </div>
+                        ))}
+                        {slotItems.length === 0 && (
+                          <div className="text-[10px] text-text-muted">—</div>
+                        )}
+                      </div>
                     </div>
-                    <div className="h-12 text-[10px] text-text-muted">
-                      —
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           </div>
         ))}
       </div>
-    </div>
-  )
-}
 
-function ExpensesView({ expenses, loading, onSelectEntity }) {
-  if (loading) {
-    return (
-      <div className="p-6">
-        <SectionTitle eyebrow="Logistics" title="Expenses" />
-        <div className="mt-4 text-[11px] text-text-secondary">Loading expenses...</div>
-      </div>
-    )
-  }
-
-  if (expenses.length === 0) {
-    return (
-      <div className="p-6">
-        <SectionTitle eyebrow="Logistics" title="Expenses" meta="$0 total" />
-        <div className="mt-4">
-          <EmptyState title="No Expenses" subtitle="Expenses will appear here once added" />
+      <InlineModal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Item' : 'Add Itinerary Item'}>
+        <div className="space-y-3">
+          <FormField label="Title">
+            <TextInput value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Depart Sydney" />
+          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Day">
+              <SelectField value={form.day_id} onChange={(e) => setForm({ ...form, day_id: e.target.value })} options={days} />
+            </FormField>
+            <FormField label="Row">
+              <SelectField value={form.row_id} onChange={(e) => setForm({ ...form, row_id: e.target.value })} options={rows} />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <FormField label="Start Slot">
+              <SelectField value={form.start_slot} onChange={(e) => setForm({ ...form, start_slot: e.target.value })} options={slots} />
+            </FormField>
+            <FormField label="Span (slots)">
+              <SelectField
+                value={form.span}
+                onChange={(e) => setForm({ ...form, span: e.target.value })}
+                options={[
+                  { value: '1', label: '1 slot (6h)' },
+                  { value: '2', label: '2 slots (12h)' },
+                  { value: '3', label: '3 slots (18h)' },
+                  { value: '4', label: '4 slots (24h)' },
+                ]}
+              />
+            </FormField>
+            <FormField label="Color">
+              <SelectField value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} options={colors} />
+            </FormField>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button onClick={() => setModalOpen(false)} className="border border-border-default bg-bg-panel px-4 py-2 text-[11px] font-black uppercase tracking-wider text-text-secondary hover:text-text-primary">
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!form.title.trim()}
+              className={cn(
+                'border px-4 py-2 text-[11px] font-black uppercase tracking-wider',
+                form.title.trim() ? 'border-success bg-success-soft text-success hover:bg-success/20' : 'cursor-not-allowed border-border-default bg-bg-panel text-text-muted'
+              )}
+            >
+              {editing ? 'Update' : 'Create'}
+            </button>
+          </div>
         </div>
-      </div>
-    )
-  }
-
-  const total = expenses.reduce((sum, e) => sum + (e.amount || 0), 0)
-
-  return (
-    <div className="p-6">
-      <SectionTitle eyebrow="Logistics" title="Expenses" meta={`$${total.toFixed(0)} total`} />
-      <div className="grid gap-2">
-        {expenses.map((expense) => (
-          <button
-            key={expense.id}
-            onClick={() => onSelectEntity('expense', expense)}
-            className="flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3 text-left transition-colors hover:border-info/40 hover:bg-bg-panel"
-          >
-            <div>
-              <div className="text-[13px] font-bold text-text-primary">
-                {expense.title}
-              </div>
-              <div className="text-[10px] text-text-secondary">
-                Paid by {expense.payer_family_id}
-              </div>
-            </div>
-            <div className="text-[14px] font-black text-text-primary">
-              ${expense.amount?.toFixed(2)}
-            </div>
-          </button>
-        ))}
-      </div>
+      </InlineModal>
     </div>
   )
 }
@@ -412,6 +1014,7 @@ function PlaceholderView({ title, subtitle }) {
   )
 }
 
+/* ─── Main Dashboard ─── */
 export function Dashboard() {
   const navigate = useNavigate()
   const { tripId } = useParams()
@@ -470,6 +1073,12 @@ export function Dashboard() {
     loading: locationsLoading,
   } = useLocations(tripId)
 
+  const {
+    items: itineraryItems,
+    loading: itineraryLoading,
+    refresh: refreshItinerary,
+  } = useItineraryItems(tripId)
+
   // Entity selection handler
   const handleSelectEntity = (type, data) => {
     setSelectedEntity({ type, ...data })
@@ -526,10 +1135,40 @@ export function Dashboard() {
   const handleUpdateEntityNote = async (type, id, note) => {
     try {
       if (type === 'meal') await updateMeal(id, { note })
-      // Note: other entities don't have note field in current schema
     } catch (err) {
       console.error('Failed to update note:', err)
     }
+  }
+
+  // CRUD handlers
+  const handleCreateMeal = async (meal) => {
+    await createMeal(meal)
+    refreshMeals()
+  }
+  const handleDeleteMeal = async (id) => {
+    if (!confirm('Delete this meal?')) return
+    await deleteMeal(id)
+    refreshMeals()
+  }
+
+  const handleCreateTask = async (task) => {
+    await createTask(task)
+    refreshTasks()
+  }
+  const handleDeleteTask = async (id) => {
+    if (!confirm('Delete this task?')) return
+    await deleteTask(id)
+    refreshTasks()
+  }
+
+  const handleCreateExpense = async (expense) => {
+    await createExpense(expense)
+    refreshExpenses()
+  }
+  const handleDeleteExpense = async (id) => {
+    if (!confirm('Delete this expense?')) return
+    await deleteExpense(id)
+    refreshExpenses()
   }
 
   // Build trip meta from loaded data
@@ -566,15 +1205,27 @@ export function Dashboard() {
       case 'meals':
         return (
           <MealsView
+            tripId={tripId}
             meals={meals}
             loading={mealsLoading}
             onUpdateStatus={updateMealStatus}
             onSelectEntity={handleSelectEntity}
             isEditor={isEditor}
+            onCreate={handleCreateMeal}
+            onDelete={handleDeleteMeal}
           />
         )
       case 'itinerary':
-        return <ItineraryView days={DAYS} />
+        return (
+          <ItineraryView
+            tripId={tripId}
+            items={itineraryItems}
+            loading={itineraryLoading}
+            isEditor={isEditor}
+            families={families}
+            onRefresh={refreshItinerary}
+          />
+        )
       case 'map':
         return (
           <MapView
@@ -585,19 +1236,27 @@ export function Dashboard() {
       case 'tasks':
         return (
           <TasksView
+            tripId={tripId}
             tasks={tasks}
             loading={tasksLoading}
             onToggleStatus={toggleTaskStatus}
             onSelectEntity={handleSelectEntity}
             isEditor={isEditor}
+            onCreate={handleCreateTask}
+            onDelete={handleDeleteTask}
           />
         )
       case 'expenses':
         return (
           <ExpensesView
+            tripId={tripId}
             expenses={expenses}
             loading={expensesLoading}
             onSelectEntity={handleSelectEntity}
+            isEditor={isEditor}
+            onCreate={handleCreateExpense}
+            onDelete={handleDeleteExpense}
+            families={families}
           />
         )
       case 'activities':

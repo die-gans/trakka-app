@@ -7,6 +7,7 @@ import {
   getTasks,
   getExpenses,
   getLocations,
+  getItineraryItems,
   getTripMembers,
   getMyTripPermission,
   updateFamily,
@@ -244,6 +245,32 @@ export function useLocations(tripId) {
   }, [load])
 
   return { locations, loading, refresh: load }
+}
+
+export function useItineraryItems(tripId) {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    if (!tripId) {
+      setLoading(false)
+      return
+    }
+    try {
+      const data = await getItineraryItems(tripId)
+      setItems(data)
+    } catch (err) {
+      console.error('Failed to load itinerary items:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [tripId])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  return { items, loading, refresh: load }
 }
 
 // Seed data fallback helper

@@ -237,6 +237,11 @@ export async function toggleExpenseSettled(id, settled) {
   return updateExpense(id, { settled })
 }
 
+export async function deleteExpense(id) {
+  const { error } = await supabase.from('expenses').delete().eq('id', id)
+  if (error) throw error
+}
+
 // ============================================
 // LOCATIONS
 // ============================================
@@ -250,6 +255,76 @@ export async function getLocations(tripId) {
 
   if (error) throw error
   return data || []
+}
+
+// ============================================
+// ITINERARY ITEMS
+// ============================================
+
+export async function getItineraryItems(tripId) {
+  const { data, error } = await supabase
+    .from('itinerary_items')
+    .select(`
+      *,
+      itinerary_item_families(family_id)
+    `)
+    .eq('trip_id', tripId)
+    .order('start_slot', { ascending: true })
+
+  if (error) throw error
+  return (data || []).map((item) => ({
+    ...item,
+    family_ids: item.itinerary_item_families?.map((f) => f.family_id) || [],
+  }))
+}
+
+export async function createItineraryItem(item) {
+  const { family_ids, ...itemData } = item
+  const { data, error } = await supabase
+    .from('itinerary_items')
+    .insert(itemData)
+    .select()
+    .single()
+
+  if (error) throw error
+
+  // Link families if provided
+  if (family_ids?.length > 0) {
+    await supabase.from('itinerary_item_families').insert(
+      family_ids.map((fid) => ({ itinerary_item_id: data.id, family_id: fid }))
+    )
+  }
+
+  return data
+}
+
+export async function updateItineraryItem(id, updates) {
+  const { family_ids, ...itemData } = updates
+  const { data, error } = await supabase
+    .from('itinerary_items')
+    .update(itemData)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+
+  // Re-link families if provided
+  if (family_ids !== undefined) {
+    await supabase.from('itinerary_item_families').delete().eq('itinerary_item_id', id)
+    if (family_ids.length > 0) {
+      await supabase.from('itinerary_item_families').insert(
+        family_ids.map((fid) => ({ itinerary_item_id: id, family_id: fid }))
+      )
+    }
+  }
+
+  return data
+}
+
+export async function deleteItineraryItem(id) {
+  const { error } = await supabase.from('itinerary_items').delete().eq('id', id)
+  if (error) throw error
 }
 
 // ============================================

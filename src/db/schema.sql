@@ -298,6 +298,16 @@ CREATE POLICY "Locations readable by trip members" ON public.locations
 CREATE POLICY "Locations insertable by editors" ON public.locations
   FOR INSERT WITH CHECK (public.is_trip_editor(trip_id));
 
+-- Itinerary Items: read if member, write if editor
+CREATE POLICY "Itinerary items readable by trip members" ON public.itinerary_items
+  FOR SELECT USING (public.is_trip_member(trip_id));
+CREATE POLICY "Itinerary items insertable by editors" ON public.itinerary_items
+  FOR INSERT WITH CHECK (public.is_trip_editor(trip_id));
+CREATE POLICY "Itinerary items updatable by editors" ON public.itinerary_items
+  FOR UPDATE USING (public.is_trip_editor(trip_id));
+CREATE POLICY "Itinerary items deletable by editors" ON public.itinerary_items
+  FOR DELETE USING (public.is_trip_editor(trip_id));
+
 -- Meals: read if member, write if editor
 CREATE POLICY "Meals readable by trip members" ON public.meals
   FOR SELECT USING (public.is_trip_member(trip_id));
@@ -369,3 +379,4 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.checkpoints;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.tasks;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.families;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.itinerary_items;
