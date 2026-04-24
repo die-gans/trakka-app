@@ -6,6 +6,7 @@ import { SectionTitle } from '../components/ui/SectionTitle'
 import { StatusPill } from '../components/ui/StatusPill'
 import { WeatherWidget } from '../components/WeatherWidget'
 import { MapView } from '../components/MapView'
+import InspectorRail from '../components/InspectorRail'
 import {
   useTrip,
   useFamilies,
@@ -14,10 +15,12 @@ import {
   useExpenses,
   useTripPermission,
   useTripMembers,
+  useLocations,
 } from '../hooks/useTripData'
 import { DAYS } from '../data/seedTrip'
 import { signOut } from '../lib/supabase'
 import { cn } from '../lib/utils'
+import { createTask, updateMeal, updateTask, updateExpense } from '../lib/supabase-crud'
 
 function EmptyState({ title, subtitle }) {
   return (
@@ -28,7 +31,7 @@ function EmptyState({ title, subtitle }) {
   )
 }
 
-function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness, isEditor }) {
+function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness, onSelectEntity, isEditor }) {
   if (loading) {
     return (
       <div className="p-6">
@@ -54,9 +57,10 @@ function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness,
       <SectionTitle eyebrow="Units" title="Convoy Status" meta={`${families.length} units`} />
       <div className="grid gap-3">
         {families.map((family) => (
-          <div
+          <button
             key={family.id}
-            className="border border-border-default bg-bg-surface p-4"
+            onClick={() => onSelectEntity('family', family)}
+            className="border border-border-default bg-bg-surface p-4 text-left transition-colors hover:border-info/40 hover:bg-bg-panel"
           >
             <div className="flex items-start justify-between">
               <div>
@@ -142,14 +146,14 @@ function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness,
                 </div>
               </div>
             )}
-          </div>
+          </button>
         ))}
       </div>
     </div>
   )
 }
 
-function MealsView({ meals, loading, onUpdateStatus, isEditor }) {
+function MealsView({ meals, loading, onUpdateStatus, onSelectEntity, isEditor }) {
   if (loading) {
     return (
       <div className="p-6">
@@ -175,9 +179,10 @@ function MealsView({ meals, loading, onUpdateStatus, isEditor }) {
       <SectionTitle eyebrow="Logistics" title="Meal Plan" meta={`${meals.length} meals`} />
       <div className="grid gap-2">
         {meals.map((meal) => (
-          <div
+          <button
             key={meal.id}
-            className="flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3"
+            onClick={() => onSelectEntity('meal', meal)}
+            className="flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3 text-left transition-colors hover:border-info/40 hover:bg-bg-panel"
           >
             <div>
               <div className="text-[10px] font-black uppercase tracking-wider text-text-secondary">
@@ -208,14 +213,14 @@ function MealsView({ meals, loading, onUpdateStatus, isEditor }) {
                 <StatusPill tone={meal.status}>{meal.status}</StatusPill>
               </button>
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>
   )
 }
 
-function TasksView({ tasks, loading, onToggleStatus, isEditor }) {
+function TasksView({ tasks, loading, onToggleStatus, onSelectEntity, isEditor }) {
   if (loading) {
     return (
       <div className="p-6">
@@ -244,24 +249,28 @@ function TasksView({ tasks, loading, onToggleStatus, isEditor }) {
       <SectionTitle eyebrow="Operations" title="Task Board" meta={`${pending.length} open · ${done.length} done`} />
       <div className="grid gap-2">
         {tasks.map((task) => (
-          <button
+          <div
             key={task.id}
-            disabled={!isEditor}
-            onClick={() => onToggleStatus(task.id, task.status)}
-            className={cn(
-              'flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3 text-left',
-              !isEditor && 'cursor-default opacity-60'
-            )}
+            onClick={() => onSelectEntity('task', task)}
+            className="flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3 text-left transition-colors hover:border-info/40 hover:bg-bg-panel cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <span className={cn(
-                'h-4 w-4 border flex items-center justify-center',
-                task.status === 'done'
-                  ? 'border-success bg-success-soft text-success'
-                  : 'border-border-default bg-bg-panel'
-              )}>
+              <button
+                disabled={!isEditor}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggleStatus(task.id, task.status)
+                }}
+                className={cn(
+                  'h-4 w-4 border flex items-center justify-center',
+                  !isEditor && 'cursor-default opacity-60',
+                  task.status === 'done'
+                    ? 'border-success bg-success-soft text-success'
+                    : 'border-border-default bg-bg-panel'
+                )}
+              >
                 {task.status === 'done' && '✓'}
-              </span>
+              </button>
               <div>
                 <div className={cn(
                   'text-[12px] font-bold',
@@ -277,7 +286,7 @@ function TasksView({ tasks, loading, onToggleStatus, isEditor }) {
             <StatusPill tone={task.status === 'done' ? 'done' : 'open'}>
               {task.status === 'done' ? 'Done' : 'Open'}
             </StatusPill>
-          </button>
+          </div>
         ))}
       </div>
     </div>
@@ -336,7 +345,7 @@ function ItineraryView({ days }) {
   )
 }
 
-function ExpensesView({ expenses, loading }) {
+function ExpensesView({ expenses, loading, onSelectEntity }) {
   if (loading) {
     return (
       <div className="p-6">
@@ -364,9 +373,10 @@ function ExpensesView({ expenses, loading }) {
       <SectionTitle eyebrow="Logistics" title="Expenses" meta={`$${total.toFixed(0)} total`} />
       <div className="grid gap-2">
         {expenses.map((expense) => (
-          <div
+          <button
             key={expense.id}
-            className="flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3"
+            onClick={() => onSelectEntity('expense', expense)}
+            className="flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3 text-left transition-colors hover:border-info/40 hover:bg-bg-panel"
           >
             <div>
               <div className="text-[13px] font-bold text-text-primary">
@@ -379,7 +389,7 @@ function ExpensesView({ expenses, loading }) {
             <div className="text-[14px] font-black text-text-primary">
               ${expense.amount?.toFixed(2)}
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>
@@ -408,6 +418,7 @@ export function Dashboard() {
   const [activePage, setActivePage] = useState('families')
   const [activeFamily, setActiveFamily] = useState('sydney-crew')
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedEntity, setSelectedEntity] = useState(null)
 
   const handleSignOut = async () => {
     try {
@@ -431,24 +442,95 @@ export function Dashboard() {
     loading: familiesLoading,
     toggleChecklist,
     updateReadiness,
+    refresh: refreshFamilies,
   } = useFamilies(tripId)
 
   const {
     meals,
     loading: mealsLoading,
     updateStatus: updateMealStatus,
+    refresh: refreshMeals,
   } = useMeals(tripId)
 
   const {
     tasks,
     loading: tasksLoading,
     toggleStatus: toggleTaskStatus,
+    refresh: refreshTasks,
   } = useTasks(tripId)
 
   const {
     expenses,
     loading: expensesLoading,
+    refresh: refreshExpenses,
   } = useExpenses(tripId)
+
+  const {
+    locations,
+    loading: locationsLoading,
+  } = useLocations(tripId)
+
+  // Entity selection handler
+  const handleSelectEntity = (type, data) => {
+    setSelectedEntity({ type, ...data })
+  }
+
+  const handleClearSelection = () => {
+    setSelectedEntity(null)
+  }
+
+  // Add task linked to entity
+  const handleAddTask = async (task) => {
+    try {
+      await createTask(task)
+      refreshTasks()
+    } catch (err) {
+      console.error('Failed to create task:', err)
+    }
+  }
+
+  // Toggle meal status with cycle
+  const handleToggleMealStatus = async (mealId, currentStatus) => {
+    const statuses = ['Pending', 'Assigned', 'Settled']
+    const nextStatus = statuses[(statuses.indexOf(currentStatus) + 1) % statuses.length]
+    try {
+      await updateMeal(mealId, { status: nextStatus })
+      refreshMeals()
+    } catch (err) {
+      console.error('Failed to update meal:', err)
+    }
+  }
+
+  // Toggle task status
+  const handleToggleTaskStatus = async (taskId, currentStatus) => {
+    const newStatus = currentStatus === 'done' ? 'open' : 'done'
+    try {
+      await updateTask(taskId, { status: newStatus })
+      refreshTasks()
+    } catch (err) {
+      console.error('Failed to update task:', err)
+    }
+  }
+
+  // Toggle expense settled
+  const handleToggleExpenseSettled = async (expenseId, settled) => {
+    try {
+      await updateExpense(expenseId, { settled })
+      refreshExpenses()
+    } catch (err) {
+      console.error('Failed to update expense:', err)
+    }
+  }
+
+  // Update entity note
+  const handleUpdateEntityNote = async (type, id, note) => {
+    try {
+      if (type === 'meal') await updateMeal(id, { note })
+      // Note: other entities don't have note field in current schema
+    } catch (err) {
+      console.error('Failed to update note:', err)
+    }
+  }
 
   // Build trip meta from loaded data
   const tripMeta = trip ? {
@@ -477,6 +559,7 @@ export function Dashboard() {
             loading={familiesLoading}
             onToggleChecklist={toggleChecklist}
             onUpdateReadiness={updateReadiness}
+            onSelectEntity={handleSelectEntity}
             isEditor={isEditor}
           />
         )
@@ -486,6 +569,7 @@ export function Dashboard() {
             meals={meals}
             loading={mealsLoading}
             onUpdateStatus={updateMealStatus}
+            onSelectEntity={handleSelectEntity}
             isEditor={isEditor}
           />
         )
@@ -504,6 +588,7 @@ export function Dashboard() {
             tasks={tasks}
             loading={tasksLoading}
             onToggleStatus={toggleTaskStatus}
+            onSelectEntity={handleSelectEntity}
             isEditor={isEditor}
           />
         )
@@ -512,6 +597,7 @@ export function Dashboard() {
           <ExpensesView
             expenses={expenses}
             loading={expensesLoading}
+            onSelectEntity={handleSelectEntity}
           />
         )
       case 'activities':
@@ -525,6 +611,7 @@ export function Dashboard() {
             loading={familiesLoading}
             onToggleChecklist={toggleChecklist}
             onUpdateReadiness={updateReadiness}
+            onSelectEntity={handleSelectEntity}
             isEditor={isEditor}
           />
         )
@@ -548,86 +635,26 @@ export function Dashboard() {
           <div className="flex-1">
             {renderPage()}
           </div>
-          {/* Inspector rail — Members & Permissions */}
-          <div className="hidden w-80 border-l border-border-default bg-bg-surface xl:block">
-            <div className="p-4">
-              <div className="text-[9px] font-black uppercase tracking-[0.2em] text-info mb-3">
-                Trip Members
-              </div>
-
-              {/* My permission badge */}
-              <div className="mb-4 border border-border-default bg-bg-panel p-3">
-                <div className="text-[9px] font-black uppercase tracking-wider text-text-secondary mb-1">
-                  Your Access
-                </div>
-                <div className="flex items-center gap-2">
-                  <StatusPill tone={isEditor ? 'success' : 'info'}>
-                    {isEditor ? 'Editor' : 'Viewer'}
-                  </StatusPill>
-                  {role === 'organizer' && (
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-warning">
-                      Organizer
-                    </span>
-                  )}
-                </div>
-                {!isEditor && (
-                  <div className="mt-2 text-[10px] text-text-secondary">
-                    View-only access. Contact the trip organizer to make changes.
-                  </div>
-                )}
-              </div>
-
-              {/* Members list */}
-              <div className="text-[9px] font-black uppercase tracking-wider text-text-secondary mb-2">
-                Joined ({members.length})
-              </div>
-              {membersLoading ? (
-                <div className="text-[11px] text-text-muted">Loading members...</div>
-              ) : members.length === 0 ? (
-                <div className="text-[11px] text-text-muted">No members yet</div>
-              ) : (
-                <div className="space-y-2">
-                  {members.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center gap-2 border border-border-default bg-bg-panel p-2"
-                    >
-                      <div className="h-7 w-7 flex-shrink-0 overflow-hidden border border-border-default bg-bg-base">
-                        {member.user?.avatar_url ? (
-                          <img
-                            src={member.user.avatar_url}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-text-secondary">
-                            {(member.user?.name || member.user?.email || '?').charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-[11px] font-bold text-text-primary">
-                          {member.user?.name || member.user?.email || 'Unknown'}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[9px] text-text-secondary">
-                            {member.role === 'organizer' ? 'Organizer' : 'Member'}
-                          </span>
-                          <span className="text-[9px] text-text-muted">·</span>
-                          <span className={cn(
-                            'text-[9px] font-bold uppercase',
-                            member.permission === 'editor' ? 'text-success' : 'text-info'
-                          )}>
-                            {member.permission}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Inspector rail */}
+          <InspectorRail
+            selectedEntity={selectedEntity}
+            onClearSelection={handleClearSelection}
+            tripId={tripId}
+            families={families}
+            meals={meals}
+            tasks={tasks}
+            expenses={expenses}
+            locations={locations}
+            members={members}
+            membersLoading={membersLoading}
+            isEditor={isEditor}
+            role={role}
+            onToggleMealStatus={handleToggleMealStatus}
+            onToggleTaskStatus={handleToggleTaskStatus}
+            onToggleExpenseSettled={handleToggleExpenseSettled}
+            onAddTask={handleAddTask}
+            onUpdateEntityNote={handleUpdateEntityNote}
+          />
         </div>
       </div>
     </div>

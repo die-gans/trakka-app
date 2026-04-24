@@ -6,6 +6,7 @@ import {
   getMeals,
   getTasks,
   getExpenses,
+  getLocations,
   getTripMembers,
   getMyTripPermission,
   updateFamily,
@@ -217,6 +218,32 @@ export function useExpenses(tripId) {
   }, [load])
 
   return { expenses, loading, refresh: load }
+}
+
+export function useLocations(tripId) {
+  const [locations, setLocations] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    if (!tripId) {
+      setLoading(false)
+      return
+    }
+    try {
+      const data = await getLocations(tripId)
+      setLocations(data)
+    } catch (err) {
+      console.error('Failed to load locations:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [tripId])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  return { locations, loading, refresh: load }
 }
 
 // Seed data fallback helper

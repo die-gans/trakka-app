@@ -233,6 +233,10 @@ export async function updateExpense(id, updates) {
   return data
 }
 
+export async function toggleExpenseSettled(id, settled) {
+  return updateExpense(id, { settled })
+}
+
 // ============================================
 // LOCATIONS
 // ============================================
