@@ -1,5 +1,7 @@
 import { supabase } from './supabase'
 
+const DEV_BYPASS = import.meta.env.VITE_DEV_AUTH_BYPASS === 'true'
+
 // ============================================
 // TRIPS
 // ============================================
@@ -43,11 +45,12 @@ export async function createTrip(trip) {
 
   if (error) throw error
 
-  // Add creator as organizer
+  // Add creator as organizer + editor
   await supabase.from('trip_members').insert({
     trip_id: data.id,
     user_id: user.id,
     role: 'organizer',
+    permission: 'editor',
   })
 
   return data
@@ -258,6 +261,78 @@ export async function getRoutes(tripId) {
 
   if (error) throw error
   return data || []
+}
+
+// ============================================
+// TRIP MEMBERS & PERMISSIONS
+// ============================================
+
+export async function getTripMembers(tripId) {
+  if (DEV_BYPASS) {
+    return [{
+      id: 'dev-member-001',
+      trip_id: tripId,
+      user_id: 'dev-user-001',
+      role: 'organizer',
+      permission: 'editor',
+      user: { name: 'Dev Operator', email: 'dev@trakka.local', avatar_url: null },
+    }]
+  }
+
+  const { data, error } = await supabase
+    .from('trip_members')
+    .select(`
+      *,
+      user:users(name, email, avatar_url)
+    `)
+    .eq('trip_id', tripId)
+    .order('joined_at', { ascending: true })
+
+  if (error) throw error
+  return data || []
+}
+
+export async function getMyTripPermission(tripId) {
+  if (DEV_BYPASS) {
+    return { permission: 'editor', role: 'organizer' }
+  }
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data, error } = await supabase
+    .from('trip_members')
+    .select('permission, role')
+    .eq('trip_id', tripId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') return null // no rows
+    throw error
+  }
+  return data
+}
+
+export async function updateMemberPermission(tripId, userId, permission) {
+  const { error } = await supabase
+    .from('trip_members')
+    .update({ permission })
+    .eq('trip_id', tripId)
+    .eq('user_id', userId)
+
+  if (error) throw error
+}
+
+export async function inviteMember(tripId, userId, permission = 'viewer') {
+  const { data, error } = await supabase
+    .from('trip_members')
+    .insert({ trip_id: tripId, user_id: userId, permission })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
 }
 
 // ============================================

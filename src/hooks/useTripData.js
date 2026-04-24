@@ -6,6 +6,8 @@ import {
   getMeals,
   getTasks,
   getExpenses,
+  getTripMembers,
+  getMyTripPermission,
   updateFamily,
   toggleChecklistItem,
   updateMeal,
@@ -13,17 +15,19 @@ import {
   subscribeToTable,
 } from '../lib/supabase-crud'
 
-const TRIP_ID = 'trip-jervis-bay-2026' // TODO: make dynamic
-
-export function useTrip() {
+export function useTrip(tripId) {
   const [trip, setTrip] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const load = useCallback(async () => {
+    if (!tripId) {
+      setLoading(false)
+      return
+    }
     try {
       setLoading(true)
-      const data = await getTrip(TRIP_ID)
+      const data = await getTrip(tripId)
       setTrip(data)
     } catch (err) {
       setError(err.message)
@@ -31,7 +35,7 @@ export function useTrip() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [tripId])
 
   useEffect(() => {
     load()
@@ -40,15 +44,19 @@ export function useTrip() {
   return { trip, loading, error, refresh: load }
 }
 
-export function useFamilies() {
+export function useFamilies(tripId) {
   const [families, setFamilies] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const load = useCallback(async () => {
+    if (!tripId) {
+      setLoading(false)
+      return
+    }
     try {
       setLoading(true)
-      const data = await getFamilies(TRIP_ID)
+      const data = await getFamilies(tripId)
       setFamilies(data)
     } catch (err) {
       setError(err.message)
@@ -56,7 +64,7 @@ export function useFamilies() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [tripId])
 
   useEffect(() => {
     load()
@@ -64,13 +72,14 @@ export function useFamilies() {
 
   // Realtime updates
   useEffect(() => {
+    if (!tripId) return
     const channel = subscribeToTable(
       'families',
-      `trip_id=eq.${TRIP_ID}`,
+      `trip_id=eq.${tripId}`,
       () => load()
     )
     return () => { supabase.removeChannel(channel) }
-  }, [load])
+  }, [tripId, load])
 
   const toggleChecklist = useCallback(async (itemId, done) => {
     try {
@@ -109,20 +118,24 @@ export function useFamilies() {
   return { families, loading, error, refresh: load, toggleChecklist, updateReadiness }
 }
 
-export function useMeals() {
+export function useMeals(tripId) {
   const [meals, setMeals] = useState([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
+    if (!tripId) {
+      setLoading(false)
+      return
+    }
     try {
-      const data = await getMeals(TRIP_ID)
+      const data = await getMeals(tripId)
       setMeals(data)
     } catch (err) {
       console.error('Failed to load meals:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [tripId])
 
   useEffect(() => {
     load()
@@ -142,20 +155,24 @@ export function useMeals() {
   return { meals, loading, refresh: load, updateStatus }
 }
 
-export function useTasks() {
+export function useTasks(tripId) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
+    if (!tripId) {
+      setLoading(false)
+      return
+    }
     try {
-      const data = await getTasks(TRIP_ID)
+      const data = await getTasks(tripId)
       setTasks(data)
     } catch (err) {
       console.error('Failed to load tasks:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [tripId])
 
   useEffect(() => {
     load()
@@ -176,20 +193,24 @@ export function useTasks() {
   return { tasks, loading, refresh: load, toggleStatus }
 }
 
-export function useExpenses() {
+export function useExpenses(tripId) {
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
+    if (!tripId) {
+      setLoading(false)
+      return
+    }
     try {
-      const data = await getExpenses(TRIP_ID)
+      const data = await getExpenses(tripId)
       setExpenses(data)
     } catch (err) {
       console.error('Failed to load expenses:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [tripId])
 
   useEffect(() => {
     load()
@@ -222,4 +243,74 @@ export function useSeedFallback() {
   }, [checkConnection])
 
   return usingSeed
+}
+
+// ============================================
+// PERMISSIONS & MEMBERS
+// ============================================
+
+export function useTripPermission(tripId) {
+  const [permission, setPermission] = useState(null)
+  const [role, setRole] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    if (!tripId) {
+      setLoading(false)
+      return
+    }
+    try {
+      setLoading(true)
+      const data = await getMyTripPermission(tripId)
+      if (data) {
+        setPermission(data.permission)
+        setRole(data.role)
+      } else {
+        setPermission(null)
+        setRole(null)
+      }
+    } catch (err) {
+      console.error('Failed to load permission:', err)
+      setPermission(null)
+      setRole(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [tripId])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const isEditor = permission === 'editor' || role === 'organizer'
+  const isViewer = permission === 'viewer' && role !== 'organizer'
+
+  return { permission, role, isEditor, isViewer, loading, refresh: load }
+}
+
+export function useTripMembers(tripId) {
+  const [members, setMembers] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    if (!tripId) {
+      setLoading(false)
+      return
+    }
+    try {
+      setLoading(true)
+      const data = await getTripMembers(tripId)
+      setMembers(data)
+    } catch (err) {
+      console.error('Failed to load trip members:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [tripId])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  return { members, loading, refresh: load }
 }

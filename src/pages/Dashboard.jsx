@@ -1,30 +1,50 @@
 import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { NavRail } from '../components/ui/NavRail'
 import { TopBar } from '../components/ui/TopBar'
 import { SectionTitle } from '../components/ui/SectionTitle'
 import { StatusPill } from '../components/ui/StatusPill'
 import { WeatherWidget } from '../components/WeatherWidget'
+import { MapView } from '../components/MapView'
 import {
+  useTrip,
   useFamilies,
   useMeals,
   useTasks,
   useExpenses,
+  useTripPermission,
+  useTripMembers,
 } from '../hooks/useTripData'
-import {
-  TRIP_META,
-  DAYS,
-  INITIAL_FAMILIES as SEED_FAMILIES,
-  INITIAL_MEALS as SEED_MEALS,
-  INITIAL_TASKS as SEED_TASKS,
-} from '../data/seedTrip'
+import { DAYS } from '../data/seedTrip'
+import { signOut } from '../lib/supabase'
 import { cn } from '../lib/utils'
 
-function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness }) {
+function EmptyState({ title, subtitle }) {
+  return (
+    <div className="flex h-48 flex-col items-center justify-center border border-dashed border-border-default bg-bg-panel">
+      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">{title}</div>
+      <div className="mt-1 text-[11px] text-text-secondary">{subtitle}</div>
+    </div>
+  )
+}
+
+function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness, isEditor }) {
   if (loading) {
     return (
       <div className="p-6">
         <SectionTitle eyebrow="Units" title="Convoy Status" />
-        <div className="text-[11px] text-text-secondary">Loading units...</div>
+        <div className="mt-4 text-[11px] text-text-secondary">Loading units...</div>
+      </div>
+    )
+  }
+
+  if (families.length === 0) {
+    return (
+      <div className="p-6">
+        <SectionTitle eyebrow="Units" title="Convoy Status" meta="0 units" />
+        <div className="mt-4">
+          <EmptyState title="No Units" subtitle="Add family units in trip settings" />
+        </div>
       </div>
     )
   }
@@ -42,14 +62,14 @@ function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness 
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black uppercase tracking-[0.18em] text-text-secondary">
-                    {family.short_origin}
+                    {family.short_origin || family.shortOrigin}
                   </span>
                   <h3 className="text-[14px] font-black uppercase tracking-[0.1em] text-text-primary">
                     {family.name}
                   </h3>
                 </div>
                 <div className="mt-1 text-[11px] text-text-secondary">
-                  {family.headcount} · {family.vehicle} · {family.drive_time}
+                  {family.headcount} · {family.vehicle} · {family.drive_time || family.driveTime}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -66,7 +86,7 @@ function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness 
                   Readiness
                 </div>
                 <div className={`mt-1 text-[16px] font-black ${family.readiness >= 80 ? 'text-success' : family.readiness >= 60 ? 'text-warning' : 'text-critical'}`}>
-                  {family.readiness}%
+                  {family.readiness || 0}%
                 </div>
               </div>
               <div className="border border-border-default bg-bg-panel p-2">
@@ -96,11 +116,15 @@ function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness 
                   {family.checklist_items.map((item) => (
                     <button
                       key={item.id}
+                      disabled={!isEditor}
                       onClick={async () => {
                         await onToggleChecklist(item.id, !item.done)
                         await onUpdateReadiness(family.id)
                       }}
-                      className="flex w-full items-center gap-2 text-left text-[11px]"
+                      className={cn(
+                        'flex w-full items-center gap-2 text-left text-[11px]',
+                        !isEditor && 'cursor-default opacity-60'
+                      )}
                     >
                       <span className={cn(
                         'h-3.5 w-3.5 border flex items-center justify-center text-[10px]',
@@ -125,12 +149,23 @@ function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness 
   )
 }
 
-function MealsView({ meals, loading, onUpdateStatus }) {
+function MealsView({ meals, loading, onUpdateStatus, isEditor }) {
   if (loading) {
     return (
       <div className="p-6">
         <SectionTitle eyebrow="Logistics" title="Meal Plan" />
-        <div className="text-[11px] text-text-secondary">Loading meals...</div>
+        <div className="mt-4 text-[11px] text-text-secondary">Loading meals...</div>
+      </div>
+    )
+  }
+
+  if (meals.length === 0) {
+    return (
+      <div className="p-6">
+        <SectionTitle eyebrow="Logistics" title="Meal Plan" meta="0 meals" />
+        <div className="mt-4">
+          <EmptyState title="No Meals" subtitle="Meals will appear here once added" />
+        </div>
       </div>
     )
   }
@@ -162,11 +197,13 @@ function MealsView({ meals, loading, onUpdateStatus }) {
                 {meal.owner}
               </div>
               <button
+                disabled={!isEditor}
                 onClick={() => {
                   const statuses = ['Pending', 'Assigned', 'Settled']
                   const nextStatus = statuses[(statuses.indexOf(meal.status) + 1) % statuses.length]
                   onUpdateStatus(meal.id, nextStatus)
                 }}
+                className={cn(!isEditor && 'cursor-default opacity-60')}
               >
                 <StatusPill tone={meal.status}>{meal.status}</StatusPill>
               </button>
@@ -178,12 +215,23 @@ function MealsView({ meals, loading, onUpdateStatus }) {
   )
 }
 
-function TasksView({ tasks, loading, onToggleStatus }) {
+function TasksView({ tasks, loading, onToggleStatus, isEditor }) {
   if (loading) {
     return (
       <div className="p-6">
         <SectionTitle eyebrow="Operations" title="Task Board" />
-        <div className="text-[11px] text-text-secondary">Loading tasks...</div>
+        <div className="mt-4 text-[11px] text-text-secondary">Loading tasks...</div>
+      </div>
+    )
+  }
+
+  if (tasks.length === 0) {
+    return (
+      <div className="p-6">
+        <SectionTitle eyebrow="Operations" title="Task Board" meta="0 tasks" />
+        <div className="mt-4">
+          <EmptyState title="No Tasks" subtitle="Tasks will appear here once added" />
+        </div>
       </div>
     )
   }
@@ -198,8 +246,12 @@ function TasksView({ tasks, loading, onToggleStatus }) {
         {tasks.map((task) => (
           <button
             key={task.id}
+            disabled={!isEditor}
             onClick={() => onToggleStatus(task.id, task.status)}
-            className="flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3 text-left"
+            className={cn(
+              'flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3 text-left',
+              !isEditor && 'cursor-default opacity-60'
+            )}
           >
             <div className="flex items-center gap-3">
               <span className={cn(
@@ -240,9 +292,9 @@ function ItineraryView({ days }) {
       {/* Weather Widget */}
       <div className="mb-6">
         <WeatherWidget
-          lat={TRIP_META.basecampCoordinates.lat}
-          lng={TRIP_META.basecampCoordinates.lng}
-          locationName={TRIP_META.basecampAddress}
+          lat={-35.1333}
+          lng={150.7000}
+          locationName="Jervis Bay, NSW"
         />
       </div>
 
@@ -289,7 +341,18 @@ function ExpensesView({ expenses, loading }) {
     return (
       <div className="p-6">
         <SectionTitle eyebrow="Logistics" title="Expenses" />
-        <div className="text-[11px] text-text-secondary">Loading expenses...</div>
+        <div className="mt-4 text-[11px] text-text-secondary">Loading expenses...</div>
+      </div>
+    )
+  }
+
+  if (expenses.length === 0) {
+    return (
+      <div className="p-6">
+        <SectionTitle eyebrow="Logistics" title="Expenses" meta="$0 total" />
+        <div className="mt-4">
+          <EmptyState title="No Expenses" subtitle="Expenses will appear here once added" />
+        </div>
       </div>
     )
   }
@@ -340,9 +403,27 @@ function PlaceholderView({ title, subtitle }) {
 }
 
 export function Dashboard() {
+  const navigate = useNavigate()
+  const { tripId } = useParams()
   const [activePage, setActivePage] = useState('families')
   const [activeFamily, setActiveFamily] = useState('sydney-crew')
   const [searchQuery, setSearchQuery] = useState('')
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      navigate('/login', { replace: true })
+    } catch (err) {
+      console.error('Sign out failed:', err)
+    }
+  }
+
+  // Load trip data
+  const { trip, loading: tripLoading } = useTrip(tripId)
+
+  // Permissions & members
+  const { isEditor, permission, role } = useTripPermission(tripId)
+  const { members, loading: membersLoading } = useTripMembers(tripId)
 
   // Live data from Supabase
   const {
@@ -350,64 +431,87 @@ export function Dashboard() {
     loading: familiesLoading,
     toggleChecklist,
     updateReadiness,
-  } = useFamilies()
+  } = useFamilies(tripId)
 
   const {
     meals,
     loading: mealsLoading,
     updateStatus: updateMealStatus,
-  } = useMeals()
+  } = useMeals(tripId)
 
   const {
     tasks,
     loading: tasksLoading,
     toggleStatus: toggleTaskStatus,
-  } = useTasks()
+  } = useTasks(tripId)
 
   const {
     expenses,
     loading: expensesLoading,
-  } = useExpenses()
+  } = useExpenses(tripId)
 
-  // Fallback to seed data if Supabase is empty (for demo)
-  const displayFamilies = families.length > 0 ? families : SEED_FAMILIES
-  const displayMeals = meals.length > 0 ? meals : SEED_MEALS
-  const displayTasks = tasks.length > 0 ? tasks : SEED_TASKS
+  // Build trip meta from loaded data
+  const tripMeta = trip ? {
+    id: trip.id,
+    title: trip.title,
+    commandName: trip.command_name || trip.title,
+    startDate: trip.start_date,
+    endDate: trip.end_date,
+    basecampAddress: trip.basecamp_address || '',
+    basecampCoordinates: {
+      lat: trip.basecamp_lat || -35.1333,
+      lng: trip.basecamp_lng || 150.7000,
+    },
+  } : {
+    commandName: 'Loading...',
+    basecampAddress: '',
+    basecampCoordinates: { lat: -35.1333, lng: 150.7000 },
+  }
 
   const renderPage = () => {
     switch (activePage) {
       case 'families':
         return (
           <FamiliesView
-            families={displayFamilies}
-            loading={familiesLoading && families.length === 0}
+            families={families}
+            loading={familiesLoading}
             onToggleChecklist={toggleChecklist}
             onUpdateReadiness={updateReadiness}
+            isEditor={isEditor}
           />
         )
       case 'meals':
         return (
           <MealsView
-            meals={displayMeals}
-            loading={mealsLoading && meals.length === 0}
+            meals={meals}
+            loading={mealsLoading}
             onUpdateStatus={updateMealStatus}
+            isEditor={isEditor}
           />
         )
       case 'itinerary':
         return <ItineraryView days={DAYS} />
+      case 'map':
+        return (
+          <MapView
+            tripMeta={tripMeta}
+            families={families}
+          />
+        )
       case 'tasks':
         return (
           <TasksView
-            tasks={displayTasks}
-            loading={tasksLoading && tasks.length === 0}
+            tasks={tasks}
+            loading={tasksLoading}
             onToggleStatus={toggleTaskStatus}
+            isEditor={isEditor}
           />
         )
       case 'expenses':
         return (
           <ExpensesView
             expenses={expenses}
-            loading={expensesLoading && expenses.length === 0}
+            loading={expensesLoading}
           />
         )
       case 'activities':
@@ -417,10 +521,11 @@ export function Dashboard() {
       default:
         return (
           <FamiliesView
-            families={displayFamilies}
+            families={families}
             loading={familiesLoading}
             onToggleChecklist={toggleChecklist}
             onUpdateReadiness={updateReadiness}
+            isEditor={isEditor}
           />
         )
     }
@@ -431,26 +536,96 @@ export function Dashboard() {
       <NavRail activePage={activePage} onPageChange={setActivePage} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
-          tripName={TRIP_META.commandName}
-          families={SEED_FAMILIES}
+          tripName={tripMeta.commandName}
+          families={families}
           activeFamily={activeFamily}
           onFamilyChange={setActiveFamily}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          onSignOut={handleSignOut}
         />
         <div className="flex min-h-0 flex-1 overflow-auto">
           <div className="flex-1">
             {renderPage()}
           </div>
-          {/* Inspector rail */}
+          {/* Inspector rail — Members & Permissions */}
           <div className="hidden w-80 border-l border-border-default bg-bg-surface xl:block">
             <div className="p-4">
-              <div className="text-[9px] font-black uppercase tracking-[0.2em] text-info mb-2">
-                Inspector
+              <div className="text-[9px] font-black uppercase tracking-[0.2em] text-info mb-3">
+                Trip Members
               </div>
-              <div className="text-[12px] font-bold text-text-secondary">
-                Select an item to inspect
+
+              {/* My permission badge */}
+              <div className="mb-4 border border-border-default bg-bg-panel p-3">
+                <div className="text-[9px] font-black uppercase tracking-wider text-text-secondary mb-1">
+                  Your Access
+                </div>
+                <div className="flex items-center gap-2">
+                  <StatusPill tone={isEditor ? 'success' : 'info'}>
+                    {isEditor ? 'Editor' : 'Viewer'}
+                  </StatusPill>
+                  {role === 'organizer' && (
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-warning">
+                      Organizer
+                    </span>
+                  )}
+                </div>
+                {!isEditor && (
+                  <div className="mt-2 text-[10px] text-text-secondary">
+                    View-only access. Contact the trip organizer to make changes.
+                  </div>
+                )}
               </div>
+
+              {/* Members list */}
+              <div className="text-[9px] font-black uppercase tracking-wider text-text-secondary mb-2">
+                Joined ({members.length})
+              </div>
+              {membersLoading ? (
+                <div className="text-[11px] text-text-muted">Loading members...</div>
+              ) : members.length === 0 ? (
+                <div className="text-[11px] text-text-muted">No members yet</div>
+              ) : (
+                <div className="space-y-2">
+                  {members.map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex items-center gap-2 border border-border-default bg-bg-panel p-2"
+                    >
+                      <div className="h-7 w-7 flex-shrink-0 overflow-hidden border border-border-default bg-bg-base">
+                        {member.user?.avatar_url ? (
+                          <img
+                            src={member.user.avatar_url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-text-secondary">
+                            {(member.user?.name || member.user?.email || '?').charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[11px] font-bold text-text-primary">
+                          {member.user?.name || member.user?.email || 'Unknown'}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] text-text-secondary">
+                            {member.role === 'organizer' ? 'Organizer' : 'Member'}
+                          </span>
+                          <span className="text-[9px] text-text-muted">·</span>
+                          <span className={cn(
+                            'text-[9px] font-bold uppercase',
+                            member.permission === 'editor' ? 'text-success' : 'text-info'
+                          )}>
+                            {member.permission}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

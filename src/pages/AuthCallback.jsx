@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { exchangeCodeForSession } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
 export function AuthCallback() {
   const navigate = useNavigate()
+  const { setAuthError } = useAuth()
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -14,22 +16,24 @@ export function AuthCallback() {
         const code = params.get('code')
 
         if (!code) {
-          // No code present — maybe we're using hash-based auth
-          // Supabase client with detectSessionInUrl: true handles this automatically
-          navigate('/')
+          // No code present — redirect to login
+          navigate('/login', { replace: true })
           return
         }
 
         await exchangeCodeForSession(code)
-        navigate('/')
+        // Success — redirect to dashboard
+        navigate('/', { replace: true })
       } catch (err) {
         console.error('Auth callback error:', err)
-        setError(err.message || 'Failed to sign in')
+        const message = err.message || 'Failed to sign in'
+        setError(message)
+        setAuthError(message)
       }
     }
 
     handleCallback()
-  }, [navigate])
+  }, [navigate, setAuthError])
 
   if (error) {
     return (
@@ -38,7 +42,7 @@ export function AuthCallback() {
           <div className="text-[12px] font-bold text-critical">Sign-in failed</div>
           <div className="mt-2 text-[11px] text-text-secondary">{error}</div>
           <button
-            onClick={() => window.location.href = '/'}
+            onClick={() => navigate('/login', { replace: true })}
             className="mt-4 border border-border-default bg-bg-panel px-4 py-2 text-[11px] font-bold text-text-primary"
           >
             Try again

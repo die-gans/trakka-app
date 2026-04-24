@@ -4,18 +4,22 @@ import {
   Home,
   Utensils,
   Map,
+  MapPin,
   Receipt,
   Users,
   Download,
   MessageSquare,
   Settings,
+  ListChecks,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
   { id: 'itinerary', label: 'Itinerary', icon: LayoutGrid },
+  { id: 'map', label: 'Map', icon: MapPin },
   { id: 'stay', label: 'Stay', icon: Home },
   { id: 'meals', label: 'Meals', icon: Utensils },
   { id: 'activities', label: 'Activities', icon: Map },
+  { id: 'tasks', label: 'Tasks', icon: ListChecks },
   { id: 'expenses', label: 'Expenses', icon: Receipt },
   { id: 'families', label: 'Families', icon: Users },
 ]

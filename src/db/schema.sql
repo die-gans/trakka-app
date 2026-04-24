@@ -63,6 +63,7 @@ CREATE TABLE public.trip_members (
   user_id uuid REFERENCES public.users(id) ON DELETE CASCADE,
   family_id uuid REFERENCES public.families(id) ON DELETE SET NULL,
   role text DEFAULT 'member' CHECK (role IN ('organizer', 'member')),
+  permission text DEFAULT 'editor' CHECK (permission IN ('viewer', 'editor')),
   joined_at timestamptz DEFAULT now(),
   UNIQUE(trip_id, user_id)
 );
@@ -258,6 +259,19 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Helper: is user an editor of this trip?
+CREATE OR REPLACE FUNCTION public.is_trip_editor(trip_uuid uuid)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.trip_members
+    WHERE trip_id = trip_uuid
+      AND user_id = auth.uid()
+      AND permission = 'editor'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Trips: read if member, write if organizer
 CREATE POLICY "Trips readable by members" ON public.trips
   FOR SELECT USING (public.is_trip_member(id) OR created_by = auth.uid());
@@ -268,56 +282,76 @@ CREATE POLICY "Trips insertable by anyone" ON public.trips
 CREATE POLICY "Trips updatable by organizer" ON public.trips
   FOR UPDATE USING (created_by = auth.uid());
 
--- Families: read if trip member, write if trip member
+-- Families: read if trip member, write if editor
 CREATE POLICY "Families readable by trip members" ON public.families
   FOR SELECT USING (public.is_trip_member(trip_id));
 
-CREATE POLICY "Families insertable by trip members" ON public.families
-  FOR INSERT WITH CHECK (public.is_trip_member(trip_id));
+CREATE POLICY "Families insertable by editors" ON public.families
+  FOR INSERT WITH CHECK (public.is_trip_editor(trip_id));
 
-CREATE POLICY "Families updatable by trip members" ON public.families
-  FOR UPDATE USING (public.is_trip_member(trip_id));
+CREATE POLICY "Families updatable by editors" ON public.families
+  FOR UPDATE USING (public.is_trip_editor(trip_id));
 
--- Apply same pattern to other tables...
+-- Locations: read if member, write if editor
 CREATE POLICY "Locations readable by trip members" ON public.locations
   FOR SELECT USING (public.is_trip_member(trip_id));
-CREATE POLICY "Locations insertable by trip members" ON public.locations
-  FOR INSERT WITH CHECK (public.is_trip_member(trip_id));
+CREATE POLICY "Locations insertable by editors" ON public.locations
+  FOR INSERT WITH CHECK (public.is_trip_editor(trip_id));
 
+-- Meals: read if member, write if editor
 CREATE POLICY "Meals readable by trip members" ON public.meals
   FOR SELECT USING (public.is_trip_member(trip_id));
-CREATE POLICY "Meals insertable by trip members" ON public.meals
-  FOR INSERT WITH CHECK (public.is_trip_member(trip_id));
+CREATE POLICY "Meals insertable by editors" ON public.meals
+  FOR INSERT WITH CHECK (public.is_trip_editor(trip_id));
+CREATE POLICY "Meals updatable by editors" ON public.meals
+  FOR UPDATE USING (public.is_trip_editor(trip_id));
 
+-- Tasks: read if member, write if editor
 CREATE POLICY "Tasks readable by trip members" ON public.tasks
   FOR SELECT USING (public.is_trip_member(trip_id));
-CREATE POLICY "Tasks insertable by trip members" ON public.tasks
-  FOR INSERT WITH CHECK (public.is_trip_member(trip_id));
+CREATE POLICY "Tasks insertable by editors" ON public.tasks
+  FOR INSERT WITH CHECK (public.is_trip_editor(trip_id));
+CREATE POLICY "Tasks updatable by editors" ON public.tasks
+  FOR UPDATE USING (public.is_trip_editor(trip_id));
 
+-- Expenses: read if member, write if editor
 CREATE POLICY "Expenses readable by trip members" ON public.expenses
   FOR SELECT USING (public.is_trip_member(trip_id));
-CREATE POLICY "Expenses insertable by trip members" ON public.expenses
-  FOR INSERT WITH CHECK (public.is_trip_member(trip_id));
+CREATE POLICY "Expenses insertable by editors" ON public.expenses
+  FOR INSERT WITH CHECK (public.is_trip_editor(trip_id));
 
+-- Checkpoints: read if member, write if editor
 CREATE POLICY "Checkpoints readable by trip members" ON public.checkpoints
   FOR SELECT USING (public.is_trip_member(trip_id));
-CREATE POLICY "Checkpoints insertable by trip members" ON public.checkpoints
-  FOR INSERT WITH CHECK (public.is_trip_member(trip_id));
+CREATE POLICY "Checkpoints insertable by editors" ON public.checkpoints
+  FOR INSERT WITH CHECK (public.is_trip_editor(trip_id));
 
+-- Messages: everyone can read/send (chat is open)
 CREATE POLICY "Messages readable by trip members" ON public.messages
   FOR SELECT USING (public.is_trip_member(trip_id));
 CREATE POLICY "Messages insertable by trip members" ON public.messages
   FOR INSERT WITH CHECK (public.is_trip_member(trip_id));
 
--- Trip members: users can see their own memberships
--- Organizers can see all members of trips they created
-CREATE POLICY "Trip members readable by self or organizer" ON public.trip_members
+-- Checklist items: read if member, write if editor
+CREATE POLICY "Checklist items readable by trip members" ON public.checklist_items
   FOR SELECT USING (
-    user_id = auth.uid()
-    OR EXISTS (
-      SELECT 1 FROM public.trips WHERE id = trip_id AND created_by = auth.uid()
+    EXISTS (
+      SELECT 1 FROM public.families f
+      WHERE f.id = family_id AND public.is_trip_member(f.trip_id)
     )
   );
+
+CREATE POLICY "Checklist items updatable by editors" ON public.checklist_items
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM public.families f
+      WHERE f.id = family_id AND public.is_trip_editor(f.trip_id)
+    )
+  );
+
+-- Trip members: anyone in the trip can see who's joined
+CREATE POLICY "Trip members readable by trip members" ON public.trip_members
+  FOR SELECT USING (public.is_trip_member(trip_id));
 
 CREATE POLICY "Trip members insertable by organizer" ON public.trip_members
   FOR INSERT WITH CHECK (

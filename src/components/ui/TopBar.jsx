@@ -1,7 +1,7 @@
-import { Search } from 'lucide-react'
+import { Search, LogOut } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
-export function TopBar({ tripName, families, activeFamily, onFamilyChange, searchQuery, onSearchChange }) {
+export function TopBar({ tripName, families, activeFamily, onFamilyChange, searchQuery, onSearchChange, onSignOut }) {
   return (
     <div className="flex h-12 items-center justify-between border-b border-border-default bg-bg-surface px-6">
       {/* Left: classification + trip name */}
@@ -15,7 +15,7 @@ export function TopBar({ tripName, families, activeFamily, onFamilyChange, searc
         </div>
       </div>
 
-      {/* Right: family switcher + autosave + search */}
+      {/* Right: family switcher + autosave + search + sign out */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
           <div className="text-[9px] font-black uppercase tracking-[0.18em] text-text-secondary">
@@ -34,7 +34,7 @@ export function TopBar({ tripName, families, activeFamily, onFamilyChange, searc
                     : 'border-border-default bg-bg-panel text-text-secondary',
                 )}
               >
-                {family.shortOrigin}
+                {family.short_origin || family.shortOrigin || '?'}
               </button>
             ))}
           </div>
@@ -54,6 +54,17 @@ export function TopBar({ tripName, families, activeFamily, onFamilyChange, searc
             className="w-64 rounded-[2px] border border-border-default bg-bg-panel py-1.5 pl-10 pr-4 text-[11px] text-text-primary outline-none focus:border-info"
           />
         </div>
+
+        {onSignOut && (
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="flex items-center gap-1.5 border border-border-default bg-bg-panel px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-text-secondary transition-colors hover:border-critical/50 hover:text-critical"
+          >
+            <LogOut size={12} />
+            Exit
+          </button>
+        )}
       </div>
     </div>
   )

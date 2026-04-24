@@ -52,11 +52,12 @@ export async function seedTripToSupabase() {
 
   console.log('TRAKKA: Created trip:', trip.id)
 
-  // 2. Add creator as organizer
+  // 2. Add creator as organizer + editor
   await supabase.from('trip_members').insert({
     trip_id: trip.id,
     user_id: user.id,
     role: 'organizer',
+    permission: 'editor',
   })
 
   // 3. Create families with checklists
