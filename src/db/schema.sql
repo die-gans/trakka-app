@@ -309,8 +309,22 @@ CREATE POLICY "Messages readable by trip members" ON public.messages
 CREATE POLICY "Messages insertable by trip members" ON public.messages
   FOR INSERT WITH CHECK (public.is_trip_member(trip_id));
 
-CREATE POLICY "Trip members readable by trip members" ON public.trip_members
-  FOR SELECT USING (public.is_trip_member(trip_id));
+-- Trip members: users can see their own memberships
+-- Organizers can see all members of trips they created
+CREATE POLICY "Trip members readable by self or organizer" ON public.trip_members
+  FOR SELECT USING (
+    user_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.trips WHERE id = trip_id AND created_by = auth.uid()
+    )
+  );
+
+CREATE POLICY "Trip members insertable by organizer" ON public.trip_members
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.trips WHERE id = trip_id AND created_by = auth.uid()
+    )
+  );
 
 -- ============================================
 -- REALTIME SUBSCRIPTIONS
