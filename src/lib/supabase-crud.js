@@ -17,7 +17,8 @@ export async function getTrip(tripId) {
 }
 
 export async function getTripsForUser() {
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) return []
 
   const { data, error } = await supabase
@@ -34,7 +35,8 @@ export async function getTripsForUser() {
 }
 
 export async function createTrip(trip) {
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) throw new Error('Not authenticated')
 
   const { data, error } = await supabase
@@ -376,7 +378,8 @@ export async function getMyTripPermission(tripId) {
     return { permission: 'editor', role: 'organizer' }
   }
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) return null
 
   const { data, error } = await supabase
