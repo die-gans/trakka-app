@@ -78,38 +78,36 @@ export function Trips() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div className={`flex-1 overflow-auto ${trips.length === 0 && !loading ? 'flex items-center justify-center' : ''}`}>
           {trips.length === 0 && !loading ? (
             /* ─── Empty State ─── */
-            <div className="flex h-full flex-col items-center justify-center px-8">
-              <div className="mx-auto max-w-sm text-center">
-                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-info">
-                  Command Centre
-                </div>
-                <h1 className="mt-3 text-[32px] font-black uppercase leading-none tracking-[0.06em] text-text-primary">
-                  Active Operations
-                </h1>
-                <p className="mx-auto mt-4 max-w-[260px] text-[13px] leading-relaxed text-text-secondary">
-                  Plan, coordinate, and execute trips with your convoy. Create a new operation or select an existing one.
-                </p>
-
-                <button
-                  onClick={() => navigate('/trips/new')}
-                  className="group mx-auto mt-10 flex w-full max-w-[320px] items-center gap-5 border-2 border-dashed border-info/40 bg-bg-surface/50 p-6 text-left transition-colors hover:border-info hover:bg-bg-elevated/30"
-                >
-                  <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center border border-info/30 bg-bg-panel transition-colors group-hover:border-info/60">
-                    <Plus size={32} className="text-info" />
-                  </div>
-                  <div>
-                    <div className="text-[15px] font-black uppercase tracking-[0.1em] text-text-primary">
-                      New Operation
-                    </div>
-                    <div className="mt-1 text-[12px] leading-snug text-text-secondary">
-                      Set up a new trip with basecamp, dates, and family units
-                    </div>
-                  </div>
-                </button>
+            <div className="w-full max-w-sm px-8 py-12 text-center">
+              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-info">
+                Command Centre
               </div>
+              <h1 className="mt-2 text-[28px] font-black uppercase leading-none tracking-[0.06em] text-text-primary">
+                Active Operations
+              </h1>
+              <p className="mt-3 text-[12px] leading-relaxed text-text-secondary">
+                Plan, coordinate, and execute trips with your convoy.
+              </p>
+
+              <button
+                onClick={() => navigate('/trips/new')}
+                className="group mt-8 flex w-full items-center gap-4 border-2 border-dashed border-info/40 bg-bg-surface/50 p-5 text-left transition-colors hover:border-info hover:bg-bg-elevated/30"
+              >
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center border border-info/30 bg-bg-panel transition-colors group-hover:border-info/60">
+                  <Plus size={24} className="text-info" />
+                </div>
+                <div>
+                  <div className="text-[13px] font-black uppercase tracking-[0.1em] text-text-primary">
+                    New Operation
+                  </div>
+                  <div className="mt-0.5 text-[11px] leading-snug text-text-secondary">
+                    Set up a trip with basecamp, dates, and family units
+                  </div>
+                </div>
+              </button>
             </div>
           ) : (
             /* ─── Trips List ─── */
