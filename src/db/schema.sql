@@ -185,7 +185,9 @@ CREATE TABLE public.expenses (
   payer_family_id uuid REFERENCES public.families(id) ON DELETE SET NULL,
   allocation_mode text DEFAULT 'equal' CHECK (allocation_mode IN ('equal', 'manual', 'individual')),
   allocations jsonb DEFAULT '{}', -- { family_id: amount }
-  created_at timestamptz DEFAULT now()
+  settled boolean DEFAULT false,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
 );
 
 -- ============================================

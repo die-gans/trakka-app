@@ -578,10 +578,12 @@ function TasksView({ tripId, tasks, loading, onToggleStatus, onSelectEntity, isE
 }
 
 /* ─── Expenses View with CRUD ─── */
-function ExpensesView({ tripId, expenses, loading, onSelectEntity, isEditor, onCreate, onDelete, families }) {
+function ExpensesView({ tripId, expenses, loading, onSelectEntity, isEditor, onCreate, onDelete, onToggleSettled, families }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({ title: '', amount: '', payer_family_id: '', allocation_mode: 'equal' })
+
+  const familyName = (id) => families.find((f) => f.id === id)?.name || '—'
 
   const openAdd = () => {
     setEditing(null)
@@ -625,6 +627,27 @@ function ExpensesView({ tripId, expenses, loading, onSelectEntity, isEditor, onC
   }
 
   const total = expenses.reduce((sum, e) => sum + (e.amount || 0), 0)
+  const unsettled = expenses.filter((e) => !e.settled)
+
+  // Settle-up: compute net balance per family (equal split only for now)
+  const settleUp = families.length > 1 ? (() => {
+    const n = families.length
+    const paid = {}   // how much each family has paid
+    const owes = {}   // how much each family owes in total
+    families.forEach((f) => { paid[f.id] = 0; owes[f.id] = 0 })
+    unsettled.forEach((e) => {
+      if (e.payer_family_id && paid[e.payer_family_id] !== undefined) {
+        paid[e.payer_family_id] += e.amount || 0
+      }
+      const share = (e.amount || 0) / n
+      families.forEach((f) => { owes[f.id] += share })
+    })
+    return families.map((f) => ({
+      id: f.id,
+      name: f.name,
+      net: paid[f.id] - owes[f.id], // positive = others owe them
+    }))
+  })() : []
 
   return (
     <div className="p-6">
@@ -640,6 +663,25 @@ function ExpensesView({ tripId, expenses, loading, onSelectEntity, isEditor, onC
         )}
       </div>
 
+      {/* Settle-up panel */}
+      {settleUp.length > 0 && unsettled.length > 0 && (
+        <div className="mt-4 border border-border-default bg-bg-surface">
+          <div className="border-b border-border-default bg-bg-panel px-4 py-2">
+            <div className="text-[9px] font-black uppercase tracking-wider text-warning">Settle Up</div>
+          </div>
+          <div className="grid divide-y divide-border-default">
+            {settleUp.map((f) => (
+              <div key={f.id} className="flex items-center justify-between px-4 py-2">
+                <div className="text-[11px] font-bold text-text-primary">{f.name}</div>
+                <div className={`text-[12px] font-black font-mono ${f.net > 0.01 ? 'text-success' : f.net < -0.01 ? 'text-critical' : 'text-text-muted'}`}>
+                  {f.net > 0.01 ? `+$${f.net.toFixed(2)} owed to them` : f.net < -0.01 ? `-$${Math.abs(f.net).toFixed(2)} they owe` : 'Even'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {expenses.length === 0 ? (
         <div className="mt-4">
           <EmptyState title="No Expenses" subtitle="Add expenses to track shared costs" />
@@ -649,20 +691,38 @@ function ExpensesView({ tripId, expenses, loading, onSelectEntity, isEditor, onC
           {expenses.map((expense) => (
             <div
               key={expense.id}
-              className="group flex items-center justify-between border border-border-default bg-bg-surface px-4 py-3 transition-colors hover:border-info/40 hover:bg-bg-panel"
+              className={cn(
+                'group flex items-center justify-between border px-4 py-3 transition-colors',
+                expense.settled
+                  ? 'border-border-default bg-bg-panel opacity-60'
+                  : 'border-border-default bg-bg-surface hover:border-info/40 hover:bg-bg-panel'
+              )}
             >
               <button onClick={() => onSelectEntity('expense', expense)} className="flex-1 text-left">
-                <div className="text-[13px] font-bold text-text-primary">
+                <div className={cn('text-[13px] font-bold', expense.settled ? 'line-through text-text-muted' : 'text-text-primary')}>
                   {expense.title}
                 </div>
                 <div className="text-[10px] text-text-secondary">
-                  Paid by {expense.payer_family_id}
+                  Paid by {familyName(expense.payer_family_id)} · {expense.allocation_mode === 'equal' ? 'Equal split' : expense.allocation_mode}
                 </div>
               </button>
               <div className="flex items-center gap-3">
-                <div className="text-[14px] font-black text-text-primary">
+                <div className="text-[14px] font-black font-mono text-text-primary">
                   ${expense.amount?.toFixed(2)}
                 </div>
+                {onToggleSettled && (
+                  <button
+                    onClick={() => onToggleSettled(expense.id, !expense.settled)}
+                    className={cn(
+                      'border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider transition-colors',
+                      expense.settled
+                        ? 'border-success bg-success-soft text-success hover:bg-success/20'
+                        : 'border-border-default bg-bg-panel text-text-muted hover:border-success hover:text-success'
+                    )}
+                  >
+                    {expense.settled ? 'Settled' : 'Settle'}
+                  </button>
+                )}
                 {isEditor && (
                   <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <button onClick={() => openEdit(expense)} className="p-1 text-text-secondary hover:text-info">
@@ -730,7 +790,7 @@ function ExpensesView({ tripId, expenses, loading, onSelectEntity, isEditor, onC
 }
 
 /* ─── Itinerary View with CRUD ─── */
-function ItineraryView({ tripId, items, loading, isEditor, families, onRefresh }) {
+function ItineraryView({ tripId, items, loading, isEditor, families, onRefresh, tripMeta }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({ title: '', day_id: 'thu', row_id: 'activities', start_slot: '0', span: '1', color: 'info' })
@@ -858,9 +918,9 @@ function ItineraryView({ tripId, items, loading, isEditor, families, onRefresh }
       {/* Weather Widget */}
       <div className="mb-6">
         <WeatherWidget
-          lat={-35.1333}
-          lng={150.7000}
-          locationName="Jervis Bay, NSW"
+          lat={tripMeta?.basecampCoordinates?.lat ?? -35.1333}
+          lng={tripMeta?.basecampCoordinates?.lng ?? 150.7000}
+          locationName={tripMeta?.basecampAddress || 'Basecamp'}
         />
       </div>
 
@@ -1256,6 +1316,7 @@ export function Dashboard() {
             isEditor={isEditor}
             onCreate={handleCreateExpense}
             onDelete={handleDeleteExpense}
+            onToggleSettled={handleToggleExpenseSettled}
             families={families}
           />
         )
