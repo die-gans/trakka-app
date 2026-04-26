@@ -2,8 +2,8 @@
 
 > **Live URL:** https://trakka-app.vercel.app  
 > **Repo:** https://github.com/die-gans/trakka-app  
-> **Last Updated:** 2026-04-24  
-> **Current Status:** v0.1 Scaffold Complete — Ready for Feature Development
+> **Last Updated:** 2026-04-26  
+> **Current Status:** v0.1 Active — Backend live, auth working, core features shipping
 
 ---
 
@@ -31,7 +31,7 @@
 - [x] Project structure (components, lib, pages, data, types)
 - [x] Git repo initialized + pushed to GitHub
 - [x] Vercel deployment pipeline live
-- [x] Environment variable: `VITE_BOM_API_KEY`
+- [x] Environment variable: `VITE_BOM_API_KEY` (production), `VITE_SUPABASE_*` (all envs)
 
 ### UI Shell
 - [x] Palantir-style dark dashboard shell
@@ -40,25 +40,37 @@
 - [x] Inspector rail panel (responsive, hidden on < xl)
 - [x] StatusPill component (semantic colors)
 - [x] SectionTitle component (eyebrow + title + meta pattern)
+- [x] **Bug fix:** Tailwind v4 `--spacing-*` @theme vars were collapsing all `max-w-*` to px values — removed unused vars, restored correct sizing
 
 ### Auth
-- [x] Supabase client configured
-- [x] Google OAuth sign-in flow
+- [x] Supabase client configured + project live (`eusciubephumojrscdgk`, ap-southeast-2)
+- [x] Google OAuth configured (client ID set, localhost + production redirect URIs)
+- [x] Anonymous auth for local dev bypass — real JWT, RLS works, no Google login required
 - [x] Login screen ("Roll Out" branding)
-- [x] Auth state management in App.jsx
-- [x] Logout capability (add to settings later)
+- [x] Auth state management (AuthContext)
+- [x] Protected routes with loading state
 
-### Seed Data (AU Focused)
-- [x] Jervis Bay long weekend scenario
-- [x] 3 family units (Sydney, Melbourne, Canberra crews)
-- [x] Routes, meals, expenses, tasks seeded
-- [x] 4-day itinerary structure
+### Backend / Database
+- [x] Supabase project live and healthy
+- [x] Full schema deployed (13 tables: trips, families, users, trip_members, meals, tasks, expenses, locations, routes, itinerary_items, checkpoints, messages, checklist_items)
+- [x] Row Level Security policies (viewer/editor roles)
+- [x] `handle_new_user` trigger — auto-creates public.users on auth signup
+- [x] `settled` + `updated_at` columns added to expenses (migration applied)
+- [x] Vercel env vars set for all environments
 
 ### Working Views
+- [x] **Trips list:** Create trip (3-step form), list existing trips with status badge
 - [x] **Families/Units:** Readiness scores, checklists, responsibilities, status
-- [x] **Meals:** Meal plan with owner + status
-- [x] **Tasks:** Task board with open/done states
-- [x] **Itinerary:** 4-day timeline grid (placeholder slots)
+- [x] **Meals:** Meal plan with owner + status toggle + CRUD
+- [x] **Tasks:** Task board with open/done/blocked states + CRUD
+- [x] **Itinerary:** 4-day timeline grid with add/delete items + CRUD
+- [x] **Expenses:** List with CRUD, family name display, settle/unsettle toggle, settle-up net balance panel
+
+### Weather
+- [x] WeatherWidget complete (current conditions, 5-day forecast, fire danger rating)
+- [x] Wired to trip's `basecamp_lat/lng` (was hardcoded to Jervis Bay)
+- [x] Live in production (API key set in Vercel)
+- [x] Graceful fallback when API key missing locally
 
 ---
 
@@ -68,76 +80,52 @@
 
 ---
 
-## 📋 Planned — v0.1 (Next 4-6 Weeks)
+## 📋 Planned — v0.1 (Next)
 
 ### High Priority
-- [ ] **Supabase Project Setup**
-  - Create Supabase project
-  - Configure Google Auth provider
-  - Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to Vercel env vars
-  - Create database schema (trips, families, locations, routes, etc.)
-  - Set up Row Level Security policies
-
 - [ ] **Mapbox Integration**
   - Add Mapbox GL map to dashboard
   - Dark map styling matching TRAKKA palette
-  - Render route lines for each family
+  - Render route lines for each family unit
   - Location markers for waypoints/basecamp
-  - Route simulation playback
+  - Route simulation / convoy playback
 
-- [ ] **CRUD Operations**
-  - Make itinerary editable (add/move/delete items)
-  - Make meals editable
-  - Make tasks toggleable (done/open)
-  - Make checklists interactive
+- [ ] **Drive plan per family**
+  - Stop-by-stop breakdown with ETAs
+  - Pairs with map — families tab shows departure + stops
 
-- [ ] **BOM Weather Integration**
-  - Fetch live weather for trip locations
-  - Display daily weather in itinerary
-  - Fire danger rating (seasonal)
-  - UV index display
-  - Fallback to seeded data on API failure
+- [ ] **Daily briefing / situation board**
+  - Live items, upcoming tasks, risk alerts consolidated view
+  - High visual impact, positions TRAKKA as a command centre not just a planner
 
 ### Medium Priority
-- [ ] **PWA Setup**
-  - Web App Manifest
-  - Service worker (basic caching)
-  - Install prompt handling
-  - Mobile viewport optimization
+- [ ] **Expense split — manual + individual modes**
+  - Equal split ✅ done; manual per-family allocation UI still needed
+  - `allocations` JSONB field ready in schema
 
 - [ ] **Checkpoint System (Mobile)**
   - "Departed" / "Arrived" / "Stopped" quick actions
   - Geolocation API for foreground tracking
-  - Manual checkpoint logging
-  - Display checkpoints on dashboard
-
-- [ ] **Expense Split Logic**
-  - Equal / Manual / Individual allocation modes
-  - Family burden calculation
-  - Settle up tracking
+  - Display checkpoints on dashboard map
 
 - [ ] **Family Group Chat**
   - Simple message thread per trip
   - Supabase realtime subscriptions
+  - `messages` table already in schema
+
+- [ ] **PWA Setup**
+  - Web App Manifest + service worker
+  - Install prompt handling
+  - Mobile viewport polish (bottom nav, touch controls)
 
 ### Low Priority (v0.2)
-- [ ] **Trip Creation Flow**
-  - Form to create new trips
-  - Add/remove family units
-  - Set basecamp location
+- [ ] **Search** — cross-entity (families, locations, meals, tasks); UI stub exists
 
-- [ ] **Search**
-  - Cross-entity search (families, locations, meals, tasks)
-  - Search results dropdown
+- [ ] **Export** — JSON/PDF itinerary
 
-- [ ] **Export**
-  - JSON export of trip state
-  - PDF itinerary generation
+- [ ] **Activities view** — currently a placeholder; schema supports it
 
-- [ ] **Responsive Polish**
-  - Mobile nav (bottom sheet or hamburger)
-  - Tablet layout optimizations
-  - Touch-friendly controls
+- [ ] **Stay view** — currently a placeholder; schema supports it
 
 ---
 
@@ -188,17 +176,21 @@ vercel --prod
 | 2026-04-24 | Mapbox over Google Maps | Better AU coverage, offline tiles, cheaper at scale, custom dark styling |
 | 2026-04-24 | Tailwind v4 | Latest utility-first CSS, CSS-based config, performance |
 | 2026-04-24 | Vercel for hosting | Git-integrated, automatic deploys, edge network, free tier generous |
+| 2026-04-26 | Anonymous auth for dev bypass | Real Supabase JWT without Google login; RLS works correctly; no fake session hacks |
+| 2026-04-26 | `getSession()` not `getUser()` in CRUD | `getUser()` validates JWT server-side on every call — too slow and fragile for client CRUD; RLS enforces auth at DB level |
+| 2026-04-26 | Settle-up as net balance per family | Simpler to read than pairwise "A owes B $X" matrix; works for equal split; extend to manual when needed |
 
 ---
 
 ## 🐛 Known Issues
 
-1. **Login page flashes before auth check completes** — add a loading skeleton
-2. **No error handling for auth failures** — need toast/alert system
-3. **Inspector rail is empty** — needs entity selection logic
-4. **Timeline grid is static** — no drag-to-resize or edit capability
-5. **Mobile viewport untested** — dashboard is desktop-optimized only
-6. **BOM API key exposed client-side** — `VITE_` prefix required for Vite, but key is low-risk public weather data
+1. **No error handling for auth failures** — need toast/alert system
+2. **Timeline grid is static** — no drag-to-resize; items are add/delete only
+3. **Mobile viewport untested** — dashboard is desktop-optimized only
+4. **BOM API key exposed client-side** — `VITE_` prefix required for Vite, but key is low-risk public weather data
+5. **Expense split — manual/individual modes** — UI accepts the mode but doesn't show per-family allocation fields yet
+6. **Trip basecamp coords not collected in CreateTrip form** — weather falls back to Jervis Bay defaults until lat/lng capture is added to the form
+7. **Weather unavailable locally** — `VITE_BOM_API_KEY` is production-only; add to Vercel dev env to fix
 
 ---
 
@@ -214,7 +206,7 @@ vercel --prod
 6. Pages are in `src/pages/` — Dashboard.jsx is the main view, Login.jsx is auth
 7. Run `npm run dev` to see the current state
 
-**Next recommended ticket:** Supabase project setup + database schema. Without this, nothing persists.
+**Next recommended ticket:** Mapbox integration — it's the signature feature that makes this feel like a command centre rather than a planner. Token is already installed (`VITE_MAPBOX_ACCESS_TOKEN`), just needs wiring.
 
 **Style guide:**
 - 9px font for eyebrows/labels, uppercase, tracking-wider
