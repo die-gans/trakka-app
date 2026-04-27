@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, MapPin, Route } from 'lucide-react'
 import { createTrip, createRoute } from '../lib/supabase-crud'
 import { supabase } from '../lib/supabase'
-import { geocodeAddress } from '../lib/geocoding'
+import { searchPlaces } from '../lib/geocoding'
 import { fetchDirections } from '../lib/directions'
 import { cn } from '../lib/utils'
 
@@ -25,6 +25,113 @@ const DEFAULT_STOP = {
   lng: null,
 }
 
+/* ─── Place Autocomplete ─── */
+function PlaceAutocomplete({ value, onSelect, placeholder, disabled }) {
+  const [query, setQuery] = useState(value || '')
+  const [suggestions, setSuggestions] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [highlighted, setHighlighted] = useState(-1)
+  const containerRef = useRef(null)
+  const blurTimeout = useRef(null)
+
+  useEffect(() => {
+    setQuery(value || '')
+  }, [value])
+
+  useEffect(() => {
+    if (!query.trim() || query.trim().length < 2) {
+      setSuggestions([])
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      setLoading(true)
+      const results = await searchPlaces(query)
+      setSuggestions(results)
+      setOpen(results.length > 0)
+      setHighlighted(-1)
+      setLoading(false)
+    }, 250)
+
+    return () => clearTimeout(timer)
+  }, [query])
+
+  const handleSelect = (place) => {
+    setQuery(place.placeName)
+    setOpen(false)
+    onSelect?.(place)
+  }
+
+  const handleKeyDown = (e) => {
+    if (!open || suggestions.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlighted((h) => Math.min(h + 1, suggestions.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlighted((h) => Math.max(h - 1, 0))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (highlighted >= 0) {
+        handleSelect(suggestions[highlighted])
+      }
+    } else if (e.key === 'Escape') {
+      setOpen(false)
+    }
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+        onFocus={() => { if (suggestions.length > 0) setOpen(true) }}
+        onBlur={() => {
+          blurTimeout.current = setTimeout(() => setOpen(false), 150)
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="w-full border border-border-default bg-bg-panel px-3 py-2 text-[12px] text-text-primary outline-none focus:border-info disabled:opacity-40"
+      />
+      {loading && (
+        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border-default border-t-info" />
+        </div>
+      )}
+      {open && (
+        <div
+          className="absolute z-50 mt-0.5 w-full border border-border-default bg-bg-surface shadow-lg"
+          onMouseDown={(e) => { e.preventDefault(); clearTimeout(blurTimeout.current) }}
+        >
+          {suggestions.map((place, idx) => (
+            <button
+              key={place.id}
+              type="button"
+              onClick={() => handleSelect(place)}
+              className={cn(
+                'flex w-full items-start gap-2 px-3 py-2 text-left transition-colors',
+                idx === highlighted ? 'bg-info-soft' : 'hover:bg-bg-panel'
+              )}
+              onMouseEnter={() => setHighlighted(idx)}
+            >
+              <MapPin size={13} className="mt-0.5 shrink-0 text-info" />
+              <div className="min-w-0">
+                <div className="truncate text-[11px] text-text-primary">{place.placeName}</div>
+                <div className="text-[9px] text-text-secondary">
+                  {place.lat.toFixed(4)}, {place.lng.toFixed(4)}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function CreateTrip() {
   const navigate = useNavigate()
   const [saving, setSaving] = useState(false)
@@ -37,7 +144,6 @@ export function CreateTrip() {
   const [endDate, setEndDate] = useState('')
   const [basecampAddress, setBasecampAddress] = useState('')
   const [basecampCoords, setBasecampCoords] = useState(null)
-  const [geocodingBasecamp, setGeocodingBasecamp] = useState(false)
 
   // Families
   const [families, setFamilies] = useState([{ ...DEFAULT_FAMILY }])
@@ -62,26 +168,6 @@ export function CreateTrip() {
       prev.map((f, i) => (i === index ? { ...f, [field]: value } : f))
     )
   }
-
-  const geocodeBasecamp = useCallback(async () => {
-    if (!basecampAddress.trim()) return
-    setGeocodingBasecamp(true)
-    const result = await geocodeAddress(basecampAddress)
-    if (result) {
-      setBasecampCoords(result)
-    }
-    setGeocodingBasecamp(false)
-  }, [basecampAddress])
-
-  const geocodeFamilyOrigin = useCallback(async (index) => {
-    const family = families[index]
-    if (!family.origin?.trim()) return
-    const result = await geocodeAddress(family.origin)
-    if (result) {
-      updateFamily(index, 'originLat', result.lat)
-      updateFamily(index, 'originLng', result.lng)
-    }
-  }, [families])
 
   const addStop = (familyIndex) => {
     setRoutePlans((prev) =>
@@ -115,19 +201,6 @@ export function CreateTrip() {
           : rp
       )
     )
-  }
-
-  const geocodeStop = async (familyIndex, stopIndex) => {
-    const stop = routePlans[familyIndex]?.stops?.[stopIndex]
-    if (!stop?.address?.trim()) return
-    const result = await geocodeAddress(stop.address)
-    if (result) {
-      updateStop(familyIndex, stopIndex, 'lat', result.lat)
-      updateStop(familyIndex, stopIndex, 'lng', result.lng)
-      if (!stop.name) {
-        updateStop(familyIndex, stopIndex, 'name', result.placeName.split(',')[0])
-      }
-    }
   }
 
   const buildWaypointsForFamily = (familyIndex) => {
@@ -325,24 +398,14 @@ export function CreateTrip() {
                   </div>
 
                   <Field label="Basecamp Address">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={basecampAddress}
-                        onChange={(e) => setBasecampAddress(e.target.value)}
-                        onBlur={geocodeBasecamp}
-                        placeholder="e.g. Jervis Bay, NSW 2540"
-                        className="flex-1 border border-border-default bg-bg-panel px-3 py-2 text-[12px] text-text-primary outline-none focus:border-info"
-                      />
-                      <button
-                        type="button"
-                        onClick={geocodeBasecamp}
-                        disabled={geocodingBasecamp || !basecampAddress.trim()}
-                        className="shrink-0 border border-border-default bg-bg-panel px-3 py-2 text-[10px] font-black uppercase tracking-wider text-text-secondary transition-colors hover:border-info/40 hover:text-info disabled:opacity-40"
-                      >
-                        {geocodingBasecamp ? '...' : 'Lookup'}
-                      </button>
-                    </div>
+                    <PlaceAutocomplete
+                      value={basecampAddress}
+                      placeholder="e.g. Jervis Bay, NSW 2540"
+                      onSelect={(place) => {
+                        setBasecampAddress(place.placeName)
+                        setBasecampCoords({ lat: place.lat, lng: place.lng })
+                      }}
+                    />
                     {basecampCoords && (
                       <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-success">
                         <MapPin size={11} />
@@ -418,16 +481,15 @@ export function CreateTrip() {
                             placeholder="Origin code (e.g. SYD)"
                             className="border border-border-default bg-bg-panel px-3 py-2 text-[12px] text-text-primary outline-none focus:border-info"
                           />
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={family.origin}
-                              onChange={(e) => updateFamily(index, 'origin', e.target.value)}
-                              onBlur={() => geocodeFamilyOrigin(index)}
-                              placeholder="Origin city"
-                              className="flex-1 border border-border-default bg-bg-panel px-3 py-2 text-[12px] text-text-primary outline-none focus:border-info"
-                            />
-                          </div>
+                          <PlaceAutocomplete
+                            value={family.origin}
+                            placeholder="Origin city"
+                            onSelect={(place) => {
+                              updateFamily(index, 'origin', place.placeName)
+                              updateFamily(index, 'originLat', place.lat)
+                              updateFamily(index, 'originLng', place.lng)
+                            }}
+                          />
                         </div>
                         {family.originLat != null && (
                           <div className="flex items-center gap-1.5 text-[10px] text-success">
@@ -569,21 +631,18 @@ export function CreateTrip() {
                                 placeholder="Stop name"
                                 className="w-full border border-border-default bg-bg-base px-2 py-1 text-[11px] text-text-primary outline-none focus:border-info"
                               />
-                              <div className="flex gap-2">
-                                <input
-                                  type="text"
-                                  value={stop.address}
-                                  onChange={(e) => updateStop(familyIndex, stopIdx, 'address', e.target.value)}
-                                  onBlur={() => geocodeStop(familyIndex, stopIdx)}
-                                  placeholder="Address"
-                                  className="flex-1 border border-border-default bg-bg-base px-2 py-1 text-[11px] text-text-primary outline-none focus:border-info"
-                                />
-                                {stop.lat != null && (
-                                  <span className="text-[10px] text-success shrink-0 self-center">
-                                    ✓
-                                  </span>
-                                )}
-                              </div>
+                              <PlaceAutocomplete
+                                value={stop.address}
+                                placeholder="Address"
+                                onSelect={(place) => {
+                                  updateStop(familyIndex, stopIdx, 'address', place.placeName)
+                                  updateStop(familyIndex, stopIdx, 'lat', place.lat)
+                                  updateStop(familyIndex, stopIdx, 'lng', place.lng)
+                                  if (!stop.name) {
+                                    updateStop(familyIndex, stopIdx, 'name', place.placeName.split(',')[0])
+                                  }
+                                }}
+                              />
                             </div>
                             <button
                               type="button"

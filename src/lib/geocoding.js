@@ -41,3 +41,38 @@ export async function geocodeAddress(address) {
     return null
   }
 }
+
+/**
+ * Search for place suggestions using Mapbox Geocoding API with autocomplete.
+ * @param {string} query
+ * @param {number} limit
+ * @returns {Promise<Array<{id: string, placeName: string, lat: number, lng: number}>>}
+ */
+export async function searchPlaces(query, limit = 5) {
+  if (!TOKEN || !query?.trim()) return []
+
+  const url = new URL(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`)
+  url.searchParams.set('access_token', TOKEN)
+  url.searchParams.set('autocomplete', 'true')
+  url.searchParams.set('limit', String(limit))
+  url.searchParams.set('types', 'place,address,locality,neighborhood,poi')
+  url.searchParams.set('country', 'au')
+
+  try {
+    const res = await fetch(url.toString())
+    if (!res.ok) {
+      console.warn('TRAKKA: Geocoding search error', res.status)
+      return []
+    }
+    const data = await res.json()
+    return (data.features || []).map((f) => ({
+      id: f.id,
+      placeName: f.place_name,
+      lat: f.center[1],
+      lng: f.center[0],
+    }))
+  } catch (err) {
+    console.warn('TRAKKA: Geocoding search failed', err)
+    return []
+  }
+}
