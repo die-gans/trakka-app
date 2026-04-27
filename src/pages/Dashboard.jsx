@@ -822,12 +822,25 @@ function ItineraryView({ tripId, items, loading, isEditor, families, onRefresh, 
     { value: 'support', label: 'Support' },
   ]
 
-  const openAdd = (dayId, slotValue) => {
+  const LANES = [
+    { id: 'travel', label: 'Travel' },
+    { id: 'activities', label: 'Activities' },
+    { id: 'support', label: 'Support' },
+  ]
+
+  const colorClasses = {
+    info: 'border-info/40 bg-info-soft text-info',
+    success: 'border-success/40 bg-success-soft text-success',
+    warning: 'border-warning/40 bg-warning-soft text-warning',
+    critical: 'border-critical/40 bg-critical-soft text-critical',
+  }
+
+  const openAdd = (dayId, laneId, slotValue) => {
     setEditing(null)
     setForm({
       title: '',
       day_id: dayId,
-      row_id: 'activities',
+      row_id: laneId,
       start_slot: String(slotValue),
       span: '1',
       color: 'info',
@@ -887,27 +900,25 @@ function ItineraryView({ tripId, items, loading, isEditor, families, onRefresh, 
     )
   }
 
-  // Group items by day
-  const itemsByDay = {}
-  DAYS.forEach((d) => { itemsByDay[d.id] = [] })
-  items.forEach((item) => {
-    if (itemsByDay[item.day_id]) itemsByDay[item.day_id].push(item)
+  // Group items: day_id → lane_id → items[]
+  const byDayLane = {}
+  DAYS.forEach((d) => {
+    byDayLane[d.id] = { travel: [], activities: [], support: [] }
   })
-
-  const colorClasses = {
-    info: 'border-info/40 bg-info-soft text-info',
-    success: 'border-success/40 bg-success-soft text-success',
-    warning: 'border-warning/40 bg-warning-soft text-warning',
-    critical: 'border-critical/40 bg-critical-soft text-critical',
-  }
+  items.forEach((item) => {
+    const dayGroup = byDayLane[item.day_id]
+    if (dayGroup && item.row_id in dayGroup) {
+      dayGroup[item.row_id].push(item)
+    }
+  })
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between">
-        <SectionTitle eyebrow="Timeline" title="Mission Timeline" meta="4 days · 6-hour slots" />
+      <div className="flex items-center justify-between mb-4">
+        <SectionTitle eyebrow="Timeline" title="Mission Timeline" meta={`${DAYS.length} days · 6-hour slots`} />
         {isEditor && (
           <button
-            onClick={() => openAdd('thu', 0)}
+            onClick={() => openAdd('thu', 'activities', 0)}
             className="flex items-center gap-1 border border-info bg-info-soft px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-info transition-colors hover:bg-info/20"
           >
             <Plus size={12} /> Add Item
@@ -924,81 +935,120 @@ function ItineraryView({ tripId, items, loading, isEditor, families, onRefresh, 
         />
       </div>
 
-      <div className="grid gap-4">
+      <div className="space-y-4">
         {DAYS.map((day) => (
           <div key={day.id} className="border border-border-default bg-bg-surface">
+            {/* Day header */}
             <div className="flex items-center justify-between border-b border-border-default bg-bg-panel px-4 py-2">
               <div className="flex items-center gap-3">
-                <span className="text-[10px] font-black uppercase tracking-wider text-info">
-                  {day.shortLabel}
-                </span>
-                <span className="text-[12px] font-bold text-text-primary">
-                  {day.title}
-                </span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-info">{day.shortLabel}</span>
+                <span className="text-[12px] font-bold text-text-primary">{day.title}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-text-secondary">{day.weather}</span>
-                <span className="text-[10px] font-bold text-text-secondary">{day.temperature}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] text-text-secondary">{day.weather} · {day.temperature}</span>
+                {isEditor && (
+                  <button
+                    onClick={() => openAdd(day.id, 'activities', 0)}
+                    className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-text-muted hover:text-info transition-colors"
+                  >
+                    <Plus size={10} /> Add
+                  </button>
+                )}
               </div>
             </div>
-            <div className="p-4">
-              <div className="grid grid-cols-4 gap-2">
-                {TIME_SLOTS.map((slot, slotIdx) => {
-                  const slotValue = slotIdx * 6
-                  const slotItems = itemsByDay[day.id].filter(
-                    (item) => item.start_slot >= slotValue && item.start_slot < slotValue + 6
-                  )
 
-                  return (
-                    <div key={slot} className="border border-border-default bg-bg-panel p-2 min-h-[80px]">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="text-[9px] font-black uppercase tracking-wider text-text-secondary">
-                          {slot}:00
+            {/* Gantt grid */}
+            <div className="overflow-x-auto">
+              {/* Time axis header */}
+              <div className="flex border-b border-border-default/60 bg-bg-panel" style={{ paddingLeft: '80px' }}>
+                {[0, 6, 12, 18].map((slot) => (
+                  <div
+                    key={slot}
+                    className="flex-1 border-l border-border-default/40 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-text-muted"
+                  >
+                    {String(slot).padStart(2, '0')}:00
+                  </div>
+                ))}
+              </div>
+
+              {/* Lane rows */}
+              {LANES.map((lane, laneIdx) => {
+                const laneItems = byDayLane[day.id]?.[lane.id] || []
+                return (
+                  <div
+                    key={lane.id}
+                    className={cn('flex min-h-[48px]', laneIdx > 0 && 'border-t border-border-default/40')}
+                  >
+                    {/* Lane label */}
+                    <div className="w-[80px] flex-shrink-0 flex items-center px-2 bg-bg-panel border-r border-border-default">
+                      <span className="text-[9px] font-black uppercase tracking-[0.15em] text-text-secondary">{lane.label}</span>
+                    </div>
+
+                    {/* Item canvas */}
+                    <div className="flex-1 relative py-1">
+                      {/* Slot dividers */}
+                      {[1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className="absolute top-0 bottom-0 border-l border-border-default/30 pointer-events-none"
+                          style={{ left: `${i * 25}%` }}
+                        />
+                      ))}
+
+                      {/* Click zones */}
+                      {isEditor && (
+                        <div className="absolute inset-0 flex">
+                          {[0, 6, 12, 18].map((slot) => (
+                            <div
+                              key={slot}
+                              className="flex-1 hover:bg-info-soft/5 cursor-pointer transition-colors"
+                              onClick={() => openAdd(day.id, lane.id, slot)}
+                            />
+                          ))}
                         </div>
-                        {isEditor && (
-                          <button
-                            onClick={() => openAdd(day.id, slotValue)}
-                            className="text-text-muted hover:text-info"
-                          >
-                            <Plus size={10} />
-                          </button>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        {slotItems.map((item) => (
+                      )}
+
+                      {/* Items */}
+                      {laneItems.map((item) => {
+                        const leftPct = (item.start_slot / 24) * 100
+                        const widthPct = ((item.span || 1) * 6 / 24) * 100
+                        const clampedWidth = Math.min(widthPct, 100 - leftPct)
+                        return (
                           <div
                             key={item.id}
                             className={cn(
-                              'group relative border px-2 py-1.5 text-[10px] font-bold',
+                              'absolute top-1.5 bottom-1.5 border px-2 flex items-center gap-1 text-[10px] font-bold overflow-hidden group cursor-default z-10',
                               colorClasses[item.color] || colorClasses.info
                             )}
+                            style={{ left: `${leftPct}%`, width: `calc(${clampedWidth}% - 2px)` }}
                           >
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="truncate">{item.title}</span>
-                              {isEditor && (
-                                <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                                  <button onClick={() => openEdit(item)} className="hover:underline">
-                                    <Pencil size={9} />
-                                  </button>
-                                  <button onClick={() => handleDelete(item.id)} className="hover:underline">
-                                    <Trash2 size={9} />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                            <div className="text-[8px] opacity-70 mt-0.5">
-                              {item.row_id}
-                            </div>
+                            <span className="truncate leading-none">{item.title}</span>
+                            {(item.span || 1) > 1 && (
+                              <span className="flex-shrink-0 text-[8px] opacity-60">{(item.span || 1) * 6}h</span>
+                            )}
+                            {isEditor && (
+                              <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openEdit(item) }}
+                                  className="p-0.5 hover:opacity-80"
+                                >
+                                  <Pencil size={9} />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleDelete(item.id) }}
+                                  className="p-0.5 hover:opacity-80"
+                                >
+                                  <Trash2 size={9} />
+                                </button>
+                              </div>
+                            )}
                           </div>
-                        ))}
-                        {slotItems.length === 0 && (
-                          <div className="text-[10px] text-text-muted">—</div>
-                        )}
-                      </div>
+                        )
+                      })}
                     </div>
-                  )
-                })}
-              </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         ))}
