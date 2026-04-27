@@ -7,6 +7,7 @@ import {
   getTasks,
   getExpenses,
   getLocations,
+  getRoutes,
   getItineraryItems,
   getTripMembers,
   getMyTripPermission,
@@ -245,6 +246,32 @@ export function useLocations(tripId) {
   }, [load])
 
   return { locations, loading, refresh: load }
+}
+
+export function useRoutes(tripId) {
+  const [routes, setRoutes] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    if (!tripId) {
+      setLoading(false)
+      return
+    }
+    try {
+      const data = await getRoutes(tripId)
+      setRoutes(data)
+    } catch (err) {
+      console.error('Failed to load routes:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [tripId])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  return { routes, loading, refresh: load }
 }
 
 export function useItineraryItems(tripId) {

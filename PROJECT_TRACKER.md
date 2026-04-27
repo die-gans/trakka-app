@@ -83,16 +83,17 @@
 ## 📋 Planned — v0.1 (Next)
 
 ### High Priority
-- [ ] **Mapbox Integration**
-  - Add Mapbox GL map to dashboard
-  - Dark map styling matching TRAKKA palette
-  - Render route lines for each family unit
-  - Location markers for waypoints/basecamp
-  - Route simulation / convoy playback
+- [x] **Mapbox Integration**
+  - Add Mapbox GL map to dashboard ✅
+  - Dark map styling matching TRAKKA palette ✅
+  - Render route lines for each family unit ✅
+  - Location markers for waypoints/basecamp ✅
+  - Route simulation / convoy playback ✅
 
 - [ ] **Drive plan per family**
   - Stop-by-stop breakdown with ETAs
   - Pairs with map — families tab shows departure + stops
+  - Route lines now live on map view
 
 - [ ] **Daily briefing / situation board**
   - Live items, upcoming tasks, risk alerts consolidated view

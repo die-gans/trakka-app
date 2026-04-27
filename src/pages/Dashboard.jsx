@@ -16,6 +16,7 @@ import {
   useTripPermission,
   useTripMembers,
   useLocations,
+  useRoutes,
   useItineraryItems,
 } from '../hooks/useTripData'
 import { DAYS, TIME_SLOTS } from '../data/seedTrip'
@@ -1184,6 +1185,11 @@ export function Dashboard() {
   } = useLocations(tripId)
 
   const {
+    routes,
+    loading: routesLoading,
+  } = useRoutes(tripId)
+
+  const {
     items: itineraryItems,
     loading: itineraryLoading,
     refresh: refreshItinerary,
@@ -1341,6 +1347,8 @@ export function Dashboard() {
           <MapView
             tripMeta={tripMeta}
             families={families}
+            locations={locations}
+            routes={routes}
           />
         )
       case 'tasks':
