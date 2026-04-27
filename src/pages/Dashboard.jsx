@@ -239,12 +239,15 @@ function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness,
       <SectionTitle eyebrow="Units" title="Convoy Status" meta={`${families.length} units`} />
       <div className="grid gap-3">
         {families.map((family) => (
-          <button
+          <div
             key={family.id}
-            onClick={() => onSelectEntity('family', family)}
             className="border border-border-default bg-bg-surface p-4 text-left transition-colors hover:border-info/40 hover:bg-bg-panel"
           >
-            <div className="flex items-start justify-between">
+            <button
+              type="button"
+              onClick={() => onSelectEntity('family', family)}
+              className="flex w-full items-start justify-between text-left"
+            >
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black uppercase tracking-[0.18em] text-text-secondary">
@@ -264,7 +267,7 @@ function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness,
                   {family.eta}
                 </div>
               </div>
-            </div>
+            </button>
 
             <div className="mt-3 grid grid-cols-3 gap-2">
               <div className="border border-border-default bg-bg-panel p-2">
@@ -330,7 +333,7 @@ function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness,
             )}
 
             <DrivePlan family={family} routes={routes} directionsByRoute={directionsByRoute} />
-          </button>
+          </div>
         ))}
       </div>
     </div>
@@ -1413,6 +1416,24 @@ export function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedEntity, setSelectedEntity] = useState(null)
 
+  // ── Data loading (must be before any effects that reference them) ──
+  const { trip, loading: tripLoading } = useTrip(tripId)
+  const { isEditor, permission, role } = useTripPermission(tripId)
+  const { members, loading: membersLoading } = useTripMembers(tripId)
+  const { families, loading: familiesLoading, toggleChecklist, updateReadiness, refresh: refreshFamilies } = useFamilies(tripId)
+  const { meals, loading: mealsLoading, updateStatus: updateMealStatus, refresh: refreshMeals } = useMeals(tripId)
+  const { tasks, loading: tasksLoading, toggleStatus: toggleTaskStatus, refresh: refreshTasks } = useTasks(tripId)
+  const { expenses, loading: expensesLoading, refresh: refreshExpenses } = useExpenses(tripId)
+  const { locations, loading: locationsLoading } = useLocations(tripId)
+  const { routes, loading: routesLoading } = useRoutes(tripId)
+  const directionsByRoute = useAllDirections(routes)
+  const { items: itineraryItems, loading: itineraryLoading, refresh: refreshItinerary } = useItineraryItems(tripId)
+
+  const operationCheckpoints = useMemo(
+    () => buildOperationCheckpoints(itineraryItems),
+    [itineraryItems]
+  )
+
   // ── Timeline playback state ──
   const [cursorSlot, setCursorSlot] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -1423,11 +1444,6 @@ export function Dashboard() {
   const playbackCursorRef = useRef(0)
   const playbackRunRef = useRef({ anchorCursor: 0, anchorTimestamp: null })
   const triggeredCheckpointIdsRef = useRef(new Set())
-
-  const operationCheckpoints = useMemo(
-    () => buildOperationCheckpoints(itineraryItems),
-    [itineraryItems]
-  )
 
   // rAF playback loop
   useEffect(() => {
@@ -1549,60 +1565,6 @@ export function Dashboard() {
       console.error('Sign out failed:', err)
     }
   }
-
-  // Load trip data
-  const { trip, loading: tripLoading } = useTrip(tripId)
-
-  // Permissions & members
-  const { isEditor, permission, role } = useTripPermission(tripId)
-  const { members, loading: membersLoading } = useTripMembers(tripId)
-
-  // Live data from Supabase
-  const {
-    families,
-    loading: familiesLoading,
-    toggleChecklist,
-    updateReadiness,
-    refresh: refreshFamilies,
-  } = useFamilies(tripId)
-
-  const {
-    meals,
-    loading: mealsLoading,
-    updateStatus: updateMealStatus,
-    refresh: refreshMeals,
-  } = useMeals(tripId)
-
-  const {
-    tasks,
-    loading: tasksLoading,
-    toggleStatus: toggleTaskStatus,
-    refresh: refreshTasks,
-  } = useTasks(tripId)
-
-  const {
-    expenses,
-    loading: expensesLoading,
-    refresh: refreshExpenses,
-  } = useExpenses(tripId)
-
-  const {
-    locations,
-    loading: locationsLoading,
-  } = useLocations(tripId)
-
-  const {
-    routes,
-    loading: routesLoading,
-  } = useRoutes(tripId)
-
-  const directionsByRoute = useAllDirections(routes)
-
-  const {
-    items: itineraryItems,
-    loading: itineraryLoading,
-    refresh: refreshItinerary,
-  } = useItineraryItems(tripId)
 
   // Entity selection handler
   const handleSelectEntity = (type, data) => {
