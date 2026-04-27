@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { cn } from '../../lib/utils'
 import {
   LayoutGrid,
@@ -20,7 +21,7 @@ const NAV_ITEMS = [
   { id: 'families', label: 'Families', icon: Users },
 ]
 
-export function NavRail({ activePage, onPageChange }) {
+export const NavRail = memo(function NavRail({ activePage, onPageChange }) {
   return (
     <div className="flex w-16 flex-col border-r border-border-default bg-bg-panel">
       {/* Logo */}
@@ -78,4 +79,4 @@ export function NavRail({ activePage, onPageChange }) {
       </div>
     </div>
   )
-}
+})

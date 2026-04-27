@@ -4,6 +4,11 @@ import { NavRail } from '../components/ui/NavRail'
 import { TopBar } from '../components/ui/TopBar'
 import { SectionTitle } from '../components/ui/SectionTitle'
 import { StatusPill } from '../components/ui/StatusPill'
+import { EmptyState } from '../components/ui/EmptyState'
+import { InlineModal } from '../components/ui/InlineModal'
+import { FormField } from '../components/ui/FormField'
+import { TextInput } from '../components/ui/TextInput'
+import { SelectField } from '../components/ui/SelectField'
 import { WeatherWidget } from '../components/WeatherWidget'
 import { MapView } from '../components/MapView'
 import { MissionLaunchModal } from '../components/MissionLaunchModal'
@@ -29,7 +34,7 @@ import {
   buildOperationCheckpoints,
   findCrossedCheckpoint,
   getSuggestedPlaybackStart,
-  getCursorDay,
+
   PLAYBACK_SLOT_UNITS_PER_SECOND,
   PLAYBACK_MAX_FRAME_DELTA_SECONDS,
   PLAYBACK_STALL_RESET_SECONDS,
@@ -50,72 +55,9 @@ import {
   updateItineraryItem,
   deleteItineraryItem,
 } from '../lib/supabase-crud'
-import { Plus, Trash2, Pencil, X, Play, Pause, RotateCcw, Gauge, FileText, Check, ChevronDown, ChevronUp, Route } from 'lucide-react'
+import { Plus, Trash2, Pencil, Play, Pause, RotateCcw, Gauge, FileText, ChevronDown, ChevronUp, Route } from 'lucide-react'
 
-function EmptyState({ title, subtitle }) {
-  return (
-    <div className="flex h-48 flex-col items-center justify-center border border-dashed border-border-default bg-bg-panel">
-      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">{title}</div>
-      <div className="mt-1 text-[11px] text-text-secondary">{subtitle}</div>
-    </div>
-  )
-}
 
-/* ─── Inline Modal ─── */
-function InlineModal({ open, onClose, title, children }) {
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg-base/80 p-4">
-      <div className="w-full max-w-md border border-border-default bg-bg-surface shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border-default bg-bg-panel px-4 py-3">
-          <h3 className="text-[12px] font-black uppercase tracking-[0.12em] text-text-primary">{title}</h3>
-          <button onClick={onClose} className="text-text-secondary hover:text-text-primary">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="p-4">{children}</div>
-      </div>
-    </div>
-  )
-}
-
-function FormField({ label, children }) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-text-secondary">
-        {label}
-      </label>
-      {children}
-    </div>
-  )
-}
-
-function TextInput({ value, onChange, placeholder, type = 'text' }) {
-  return (
-    <input
-      type={type}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      className="w-full border border-border-default bg-bg-base px-3 py-2 text-[12px] text-text-primary outline-none focus:border-info"
-    />
-  )
-}
-
-function SelectField({ value, onChange, options, placeholder }) {
-  return (
-    <select
-      value={value}
-      onChange={onChange}
-      className="w-full border border-border-default bg-bg-base px-3 py-2 text-[12px] text-text-primary outline-none focus:border-info"
-    >
-      {placeholder && <option value="">{placeholder}</option>}
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>{opt.label}</option>
-      ))}
-    </select>
-  )
-}
 
 /* ─── Drive Plan (per family) ─── */
 function DrivePlan({ family, routes, directionsByRoute }) {
@@ -671,49 +613,6 @@ function TasksView({ tripId, tasks, loading, onToggleStatus, onSelectEntity, isE
               />
             </FormField>
           </div>
-          {/* Linked Entities */}
-          <div className="border border-border-default bg-bg-panel p-3 space-y-2">
-            <div className="text-[9px] font-black uppercase tracking-[0.18em] text-info">Linked Entities</div>
-            {[
-              { label: 'Locations', source: locations || [], type: 'location', nameKey: 'title' },
-              { label: 'Meals', source: meals || [], type: 'meal', nameKey: 'meal' },
-              { label: 'Routes', source: routes || [], type: 'route', nameKey: 'id' },
-              { label: 'Tasks', source: tasks || [], type: 'task', nameKey: 'title' },
-              { label: 'Expenses', source: expenses || [], type: 'expense', nameKey: 'title' },
-            ].map(({ label, source, type, nameKey }) => (
-              source.length > 0 && (
-                <div key={type}>
-                  <div className="text-[10px] font-bold text-text-secondary mb-1">{label}</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {source.map((ent) => {
-                      const name = ent[nameKey] || ent.id
-                      const active = isLinked(type, ent.id)
-                      return (
-                        <button
-                          key={ent.id}
-                          type="button"
-                          onClick={() => toggleLinkedEntity(type, ent.id)}
-                          className={cn(
-                            'inline-flex items-center gap-1 border px-2 py-1 text-[10px] font-bold transition-colors',
-                            active
-                              ? 'border-info bg-info-soft text-info'
-                              : 'border-border-default bg-bg-surface text-text-secondary hover:border-info/40 hover:text-text-primary'
-                          )}
-                        >
-                          {active ? <Check size={10} /> : <Plus size={10} />}
-                          {name}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            ))}
-            {![locations, meals, routes, tasks, expenses].some((arr) => arr?.length > 0) && (
-              <div className="text-[10px] text-text-muted">No entities available to link.</div>
-            )}
-          </div>
-
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={() => setModalOpen(false)} className="border border-border-default bg-bg-panel px-4 py-2 text-[11px] font-black uppercase tracking-wider text-text-secondary hover:text-text-primary">
               Cancel
@@ -949,11 +848,10 @@ function ExpensesView({ tripId, expenses, loading, onSelectEntity, isEditor, onC
 
 /* ─── Itinerary View with CRUD ─── */
 function ItineraryView({
-  tripId, items, loading, isEditor, families, onRefresh, tripMeta,
+  tripId, items, loading, isEditor, onRefresh, tripMeta,
   cursorSlot, isPlaying, playbackSpeed,
   onTogglePlayback, onRestartPlayback, onSetPlaybackSpeed, onSetCursor, onOpenBriefing,
   onSelectEntity,
-  meals, locations, routes, tasks, expenses,
 }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -1047,18 +945,6 @@ function ItineraryView({
       console.error('Failed to save itinerary item:', err)
     }
   }
-
-  const toggleLinkedEntity = (type, id) => {
-    const current = form.linked_entities || []
-    const exists = current.some((le) => le.type === type && le.id === id)
-    if (exists) {
-      setForm({ ...form, linked_entities: current.filter((le) => !(le.type === type && le.id === id)) })
-    } else {
-      setForm({ ...form, linked_entities: [...current, { type, id }] })
-    }
-  }
-
-  const isLinked = (type, id) => (form.linked_entities || []).some((le) => le.type === type && le.id === id)
 
   const handleDelete = async (id) => {
     try {
@@ -1216,7 +1102,7 @@ function ItineraryView({
                         const leftPct = (item.start_slot / 24) * 100
                         const widthPct = ((item.span || 1) * 6 / 24) * 100
                         const clampedWidth = Math.min(widthPct, 100 - leftPct)
-                        const itemStartSlotGlobal = dayIndex * TIME_SLOTS.length + item.start_slot / 6
+                        const itemStartSlotGlobal = DAYS.findIndex((d) => d.id === day.id) * TIME_SLOTS.length + item.start_slot / 6
                         const itemEndSlotGlobal = itemStartSlotGlobal + (item.span || 1)
                         const isPast = cursorSlot > itemEndSlotGlobal
                         const isCurrent = cursorSlot >= itemStartSlotGlobal && cursorSlot <= itemEndSlotGlobal
@@ -1391,22 +1277,6 @@ function ItineraryView({
   )
 }
 
-function PlaceholderView({ title, subtitle }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center p-6">
-      <div className="text-[9px] font-black uppercase tracking-[0.2em] text-info mb-2">
-        {subtitle}
-      </div>
-      <div className="text-[16px] font-black uppercase tracking-[0.1em] text-text-primary">
-        {title}
-      </div>
-      <div className="mt-2 text-[11px] text-text-secondary">
-        This view is coming in v0.2
-      </div>
-    </div>
-  )
-}
-
 /* ─── Main Dashboard ─── */
 export function Dashboard() {
   const navigate = useNavigate()
@@ -1417,15 +1287,15 @@ export function Dashboard() {
   const [selectedEntity, setSelectedEntity] = useState(null)
 
   // ── Data loading (must be before any effects that reference them) ──
-  const { trip, loading: tripLoading } = useTrip(tripId)
-  const { isEditor, permission, role } = useTripPermission(tripId)
+  const { trip } = useTrip(tripId)
+  const { isEditor, role } = useTripPermission(tripId)
   const { members, loading: membersLoading } = useTripMembers(tripId)
-  const { families, loading: familiesLoading, toggleChecklist, updateReadiness, refresh: refreshFamilies } = useFamilies(tripId)
+  const { families, loading: familiesLoading, toggleChecklist, updateReadiness } = useFamilies(tripId)
   const { meals, loading: mealsLoading, updateStatus: updateMealStatus, refresh: refreshMeals } = useMeals(tripId)
   const { tasks, loading: tasksLoading, toggleStatus: toggleTaskStatus, refresh: refreshTasks } = useTasks(tripId)
   const { expenses, loading: expensesLoading, refresh: refreshExpenses } = useExpenses(tripId)
-  const { locations, loading: locationsLoading } = useLocations(tripId)
-  const { routes, loading: routesLoading } = useRoutes(tripId)
+  const { locations } = useLocations(tripId)
+  const { routes } = useRoutes(tripId)
   const directionsByRoute = useAllDirections(routes)
   const { items: itineraryItems, loading: itineraryLoading, refresh: refreshItinerary } = useItineraryItems(tripId)
 
@@ -1722,11 +1592,7 @@ export function Dashboard() {
             onSetCursor={handleSetCursor}
             onOpenBriefing={(dayId) => { setBriefingDayId(dayId); setBriefingOpen(true) }}
             onSelectEntity={handleSelectEntity}
-            meals={meals}
-            locations={locations}
-            routes={routes}
-            tasks={tasks}
-            expenses={expenses}
+
           />
         )
       case 'map':

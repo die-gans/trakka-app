@@ -8,7 +8,7 @@ export function MissionLaunchModal({ gate, onProceed, onAbort }) {
 
   useEffect(() => {
     if (!gate) return
-    setRemainingMs(gate.autoAdvanceMs || 4200)
+    const raf = requestAnimationFrame(() => setRemainingMs(gate.autoAdvanceMs || 4200))
     const startedAt = Date.now()
     const intervalId = window.setInterval(() => {
       const elapsed = Date.now() - startedAt
@@ -19,7 +19,10 @@ export function MissionLaunchModal({ gate, onProceed, onAbort }) {
         onProceed()
       }
     }, 80)
-    return () => window.clearInterval(intervalId)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.clearInterval(intervalId)
+    }
   }, [gate, onProceed])
 
   if (!gate) return null

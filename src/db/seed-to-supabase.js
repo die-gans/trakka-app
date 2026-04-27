@@ -13,7 +13,6 @@ import {
   INITIAL_EXPENSES,
   INITIAL_LOCATIONS,
   INITIAL_ROUTES,
-  DAYS,
 } from '../data/seedTrip'
 
 export async function seedTripToSupabase() {

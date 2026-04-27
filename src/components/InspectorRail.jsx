@@ -4,11 +4,8 @@ import {
   CheckSquare,
   ExternalLink,
   MapPin,
-  Plus,
   Receipt,
-  Route,
   Square,
-  Users,
   X,
 } from 'lucide-react'
 import { StatusPill } from './ui/StatusPill'
@@ -202,10 +199,13 @@ export default function InspectorRail({
   // Flash animation when selection changes
   useEffect(() => {
     if (!entity) return
-    setRecentlyUpdated(true)
+    const raf = requestAnimationFrame(() => setRecentlyUpdated(true))
     const timerId = window.setTimeout(() => setRecentlyUpdated(false), 700)
-    return () => window.clearTimeout(timerId)
-  }, [entity?.id, entity?.type])
+    return () => {
+      cancelAnimationFrame(raf)
+      window.clearTimeout(timerId)
+    }
+  }, [entity])
 
   // Resolve related data based on entity type
   const relatedTasks = useMemo(() => {
@@ -511,7 +511,7 @@ export default function InspectorRail({
               {linkedLocation.summary && (
                 <div className="text-text-secondary">{linkedLocation.summary}</div>
               )}
-              {linkedLocation.external_url && (
+              {linkedLocation.external_url && /^https?:\/\//.test(linkedLocation.external_url) && (
                 <a
                   href={linkedLocation.external_url}
                   target="_blank"

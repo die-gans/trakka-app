@@ -1,11 +1,9 @@
 import { DAY_BRIEFINGS } from '../data/seedTrip'
-import { SectionTitle } from './ui/SectionTitle'
 import { StatusPill } from './ui/StatusPill'
 import { X } from 'lucide-react'
 
 export function DailyBriefingModal({ dayId, items, meals, tasks, onClose, onSelectEntity }) {
   const briefing = DAY_BRIEFINGS[dayId]
-  const day = items?.[0]?.day_id === dayId ? items[0] : null
 
   if (!briefing) return null
 

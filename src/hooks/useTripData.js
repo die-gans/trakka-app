@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { fetchDirections } from '../lib/directions'
 import { supabase } from '../lib/supabase'
 import {
@@ -24,28 +24,41 @@ export function useTrip(tripId) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const load = useCallback(async () => {
-    if (!tripId) {
-      setLoading(false)
-      return
-    }
+  const refresh = async () => {
+    if (!tripId) return
     try {
       setLoading(true)
       const data = await getTrip(tripId)
       setTrip(data)
     } catch (err) {
       setError(err.message)
-      console.error('Failed to load trip:', err)
     } finally {
       setLoading(false)
     }
-  }, [tripId])
+  }
 
   useEffect(() => {
-    load()
-  }, [load])
+    let ignore = false
+    const run = async () => {
+      if (!tripId) {
+        if (!ignore) setLoading(false)
+        return
+      }
+      try {
+        if (!ignore) setLoading(true)
+        const data = await getTrip(tripId)
+        if (!ignore) setTrip(data)
+      } catch (err) {
+        if (!ignore) setError(err.message)
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    run()
+    return () => { ignore = true }
+  }, [tripId])
 
-  return { trip, loading, error, refresh: load }
+  return { trip, loading, error, refresh }
 }
 
 export function useFamilies(tripId) {
@@ -53,26 +66,36 @@ export function useFamilies(tripId) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const load = useCallback(async () => {
-    if (!tripId) {
-      setLoading(false)
-      return
-    }
+  const refresh = async () => {
+    if (!tripId) return
     try {
-      setLoading(true)
       const data = await getFamilies(tripId)
       setFamilies(data)
     } catch (err) {
       setError(err.message)
-      console.error('Failed to load families:', err)
-    } finally {
-      setLoading(false)
     }
-  }, [tripId])
+  }
 
   useEffect(() => {
-    load()
-  }, [load])
+    let ignore = false
+    const run = async () => {
+      if (!tripId) {
+        if (!ignore) setLoading(false)
+        return
+      }
+      try {
+        if (!ignore) setLoading(true)
+        const data = await getFamilies(tripId)
+        if (!ignore) setFamilies(data)
+      } catch (err) {
+        if (!ignore) setError(err.message)
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    run()
+    return () => { ignore = true }
+  }, [tripId])
 
   // Realtime updates
   useEffect(() => {
@@ -80,12 +103,13 @@ export function useFamilies(tripId) {
     const channel = subscribeToTable(
       'families',
       `trip_id=eq.${tripId}`,
-      () => load()
+      () => refresh()
     )
     return () => { supabase.removeChannel(channel) }
-  }, [tripId, load])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tripId])
 
-  const toggleChecklist = useCallback(async (itemId, done) => {
+  const toggleChecklist = async (itemId, done) => {
     try {
       await toggleChecklistItem(itemId, done)
       setFamilies((prev) =>
@@ -99,53 +123,65 @@ export function useFamilies(tripId) {
     } catch (err) {
       console.error('Failed to toggle checklist:', err)
     }
-  }, [])
+  }
 
-  const updateReadiness = useCallback(async (familyId) => {
-    const family = families.find((f) => f.id === familyId)
-    if (!family) return
+  const updateReadiness = async (familyId) => {
+    setFamilies((prev) => {
+      const family = prev.find((f) => f.id === familyId)
+      if (!family) return prev
 
-    const completed = family.checklist_items.filter((i) => i.done).length
-    const total = family.checklist_items.length
-    const readiness = total > 0 ? Math.round((completed / total) * 100) : 0
+      const completed = family.checklist_items.filter((i) => i.done).length
+      const total = family.checklist_items.length
+      const readiness = total > 0 ? Math.round((completed / total) * 100) : 0
 
-    try {
-      await updateFamily(familyId, { readiness })
-      setFamilies((prev) =>
-        prev.map((f) => (f.id === familyId ? { ...f, readiness } : f))
-      )
-    } catch (err) {
-      console.error('Failed to update readiness:', err)
-    }
-  }, [families])
+      updateFamily(familyId, { readiness }).catch((err) => {
+        console.error('Failed to update readiness:', err)
+      })
 
-  return { families, loading, error, refresh: load, toggleChecklist, updateReadiness }
+      return prev.map((f) => (f.id === familyId ? { ...f, readiness } : f))
+    })
+  }
+
+  return { families, loading, error, refresh, toggleChecklist, updateReadiness }
 }
 
 export function useMeals(tripId) {
   const [meals, setMeals] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const load = useCallback(async () => {
-    if (!tripId) {
-      setLoading(false)
-      return
-    }
+  const refresh = async () => {
+    if (!tripId) return
     try {
       const data = await getMeals(tripId)
       setMeals(data)
     } catch (err) {
-      console.error('Failed to load meals:', err)
-    } finally {
-      setLoading(false)
+      setError(err.message)
     }
-  }, [tripId])
+  }
 
   useEffect(() => {
-    load()
-  }, [load])
+    let ignore = false
+    const run = async () => {
+      if (!tripId) {
+        if (!ignore) setLoading(false)
+        return
+      }
+      try {
+        if (!ignore) setLoading(true)
+        const data = await getMeals(tripId)
+        if (!ignore) setMeals(data)
+      } catch (err) {
+        if (!ignore) setError(err.message)
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    run()
+    return () => { ignore = true }
+  }, [tripId])
 
-  const updateStatus = useCallback(async (mealId, status) => {
+  const updateStatus = async (mealId, status) => {
     try {
       await updateMeal(mealId, { status })
       setMeals((prev) =>
@@ -154,35 +190,48 @@ export function useMeals(tripId) {
     } catch (err) {
       console.error('Failed to update meal:', err)
     }
-  }, [])
+  }
 
-  return { meals, loading, refresh: load, updateStatus }
+  return { meals, loading, error, refresh, updateStatus }
 }
 
 export function useTasks(tripId) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const load = useCallback(async () => {
-    if (!tripId) {
-      setLoading(false)
-      return
-    }
+  const refresh = async () => {
+    if (!tripId) return
     try {
       const data = await getTasks(tripId)
       setTasks(data)
     } catch (err) {
-      console.error('Failed to load tasks:', err)
-    } finally {
-      setLoading(false)
+      setError(err.message)
     }
-  }, [tripId])
+  }
 
   useEffect(() => {
-    load()
-  }, [load])
+    let ignore = false
+    const run = async () => {
+      if (!tripId) {
+        if (!ignore) setLoading(false)
+        return
+      }
+      try {
+        if (!ignore) setLoading(true)
+        const data = await getTasks(tripId)
+        if (!ignore) setTasks(data)
+      } catch (err) {
+        if (!ignore) setError(err.message)
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    run()
+    return () => { ignore = true }
+  }, [tripId])
 
-  const toggleStatus = useCallback(async (taskId, currentStatus) => {
+  const toggleStatus = async (taskId, currentStatus) => {
     const newStatus = currentStatus === 'done' ? 'open' : 'done'
     try {
       await updateTask(taskId, { status: newStatus })
@@ -192,87 +241,126 @@ export function useTasks(tripId) {
     } catch (err) {
       console.error('Failed to toggle task:', err)
     }
-  }, [])
+  }
 
-  return { tasks, loading, refresh: load, toggleStatus }
+  return { tasks, loading, error, refresh, toggleStatus }
 }
 
 export function useExpenses(tripId) {
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const load = useCallback(async () => {
-    if (!tripId) {
-      setLoading(false)
-      return
-    }
+  const refresh = async () => {
+    if (!tripId) return
     try {
       const data = await getExpenses(tripId)
       setExpenses(data)
     } catch (err) {
-      console.error('Failed to load expenses:', err)
-    } finally {
-      setLoading(false)
+      setError(err.message)
     }
-  }, [tripId])
+  }
 
   useEffect(() => {
-    load()
-  }, [load])
+    let ignore = false
+    const run = async () => {
+      if (!tripId) {
+        if (!ignore) setLoading(false)
+        return
+      }
+      try {
+        if (!ignore) setLoading(true)
+        const data = await getExpenses(tripId)
+        if (!ignore) setExpenses(data)
+      } catch (err) {
+        if (!ignore) setError(err.message)
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    run()
+    return () => { ignore = true }
+  }, [tripId])
 
-  return { expenses, loading, refresh: load }
+  return { expenses, loading, error, refresh }
 }
 
 export function useLocations(tripId) {
   const [locations, setLocations] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const load = useCallback(async () => {
-    if (!tripId) {
-      setLoading(false)
-      return
-    }
+  const refresh = async () => {
+    if (!tripId) return
     try {
       const data = await getLocations(tripId)
       setLocations(data)
     } catch (err) {
-      console.error('Failed to load locations:', err)
-    } finally {
-      setLoading(false)
+      setError(err.message)
     }
-  }, [tripId])
+  }
 
   useEffect(() => {
-    load()
-  }, [load])
+    let ignore = false
+    const run = async () => {
+      if (!tripId) {
+        if (!ignore) setLoading(false)
+        return
+      }
+      try {
+        if (!ignore) setLoading(true)
+        const data = await getLocations(tripId)
+        if (!ignore) setLocations(data)
+      } catch (err) {
+        if (!ignore) setError(err.message)
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    run()
+    return () => { ignore = true }
+  }, [tripId])
 
-  return { locations, loading, refresh: load }
+  return { locations, loading, error, refresh }
 }
 
 export function useRoutes(tripId) {
   const [routes, setRoutes] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const load = useCallback(async () => {
-    if (!tripId) {
-      setLoading(false)
-      return
-    }
+  const refresh = async () => {
+    if (!tripId) return
     try {
       const data = await getRoutes(tripId)
       setRoutes(data)
     } catch (err) {
-      console.error('Failed to load routes:', err)
-    } finally {
-      setLoading(false)
+      setError(err.message)
     }
-  }, [tripId])
+  }
 
   useEffect(() => {
-    load()
-  }, [load])
+    let ignore = false
+    const run = async () => {
+      if (!tripId) {
+        if (!ignore) setLoading(false)
+        return
+      }
+      try {
+        if (!ignore) setLoading(true)
+        const data = await getRoutes(tripId)
+        if (!ignore) setRoutes(data)
+      } catch (err) {
+        if (!ignore) setError(err.message)
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    run()
+    return () => { ignore = true }
+  }, [tripId])
 
-  return { routes, loading, refresh: load }
+  return { routes, loading, error, refresh }
 }
 
 export function useDirections(route) {
@@ -281,9 +369,8 @@ export function useDirections(route) {
   const [error, setError] = useState(null)
   const fetchedRef = useRef(false)
 
-  const waypoints = route?.waypoints || route?.path || []
-
   useEffect(() => {
+    const waypoints = route?.waypoints || route?.path || []
     if (!waypoints || waypoints.length < 2) return
     if (fetchedRef.current) return
 
@@ -303,7 +390,7 @@ export function useDirections(route) {
     })
 
     return () => { cancelled = true }
-  }, [route?.id, waypoints])
+  }, [route?.id, route?.waypoints, route?.path])
 
   return { ...result, loading, error }
 }
@@ -331,14 +418,16 @@ export function useAllDirections(routes) {
       })
     ).then((fetched) => {
       if (cancelled) return
-      const next = { ...results }
-      fetched.forEach(({ id, data }) => {
-        if (data) {
-          next[id] = data
-          fetchedRef.current.add(id)
-        }
+      setResults((prev) => {
+        const next = { ...prev }
+        fetched.forEach(({ id, data }) => {
+          if (data) {
+            next[id] = data
+            fetchedRef.current.add(id)
+          }
+        })
+        return next
       })
-      setResults(next)
     })
 
     return () => { cancelled = true }
@@ -350,53 +439,40 @@ export function useAllDirections(routes) {
 export function useItineraryItems(tripId) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const load = useCallback(async () => {
-    if (!tripId) {
-      setLoading(false)
-      return
-    }
+  const refresh = async () => {
+    if (!tripId) return
     try {
       const data = await getItineraryItems(tripId)
       setItems(data)
     } catch (err) {
-      console.error('Failed to load itinerary items:', err)
-    } finally {
-      setLoading(false)
+      setError(err.message)
     }
+  }
+
+  useEffect(() => {
+    let ignore = false
+    const run = async () => {
+      if (!tripId) {
+        if (!ignore) setLoading(false)
+        return
+      }
+      try {
+        if (!ignore) setLoading(true)
+        const data = await getItineraryItems(tripId)
+        if (!ignore) setItems(data)
+      } catch (err) {
+        if (!ignore) setError(err.message)
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    run()
+    return () => { ignore = true }
   }, [tripId])
 
-  useEffect(() => {
-    load()
-  }, [load])
-
-  return { items, loading, refresh: load }
-}
-
-// Seed data fallback helper
-export function useSeedFallback() {
-  const [usingSeed, setUsingSeed] = useState(false)
-
-  const checkConnection = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return false
-
-      // Try to query trips table
-      const { error } = await supabase.from('trips').select('id').limit(1)
-      return !error
-    } catch {
-      return false
-    }
-  }, [])
-
-  useEffect(() => {
-    checkConnection().then((connected) => {
-      setUsingSeed(!connected)
-    })
-  }, [checkConnection])
-
-  return usingSeed
+  return { items, loading, error, refresh }
 }
 
 // ============================================
@@ -407,14 +483,11 @@ export function useTripPermission(tripId) {
   const [permission, setPermission] = useState(null)
   const [role, setRole] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const load = useCallback(async () => {
-    if (!tripId) {
-      setLoading(false)
-      return
-    }
+  const refresh = async () => {
+    if (!tripId) return
     try {
-      setLoading(true)
       const data = await getMyTripPermission(tripId)
       if (data) {
         setPermission(data.permission)
@@ -424,47 +497,86 @@ export function useTripPermission(tripId) {
         setRole(null)
       }
     } catch (err) {
-      console.error('Failed to load permission:', err)
+      setError(err.message)
       setPermission(null)
       setRole(null)
-    } finally {
-      setLoading(false)
     }
-  }, [tripId])
+  }
 
   useEffect(() => {
-    load()
-  }, [load])
+    let ignore = false
+    const run = async () => {
+      if (!tripId) {
+        if (!ignore) setLoading(false)
+        return
+      }
+      try {
+        if (!ignore) setLoading(true)
+        const data = await getMyTripPermission(tripId)
+        if (!ignore) {
+          if (data) {
+            setPermission(data.permission)
+            setRole(data.role)
+          } else {
+            setPermission(null)
+            setRole(null)
+          }
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.message)
+          setPermission(null)
+          setRole(null)
+        }
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    run()
+    return () => { ignore = true }
+  }, [tripId])
 
   const isEditor = permission === 'editor' || role === 'organizer'
   const isViewer = permission === 'viewer' && role !== 'organizer'
 
-  return { permission, role, isEditor, isViewer, loading, refresh: load }
+  return { permission, role, isEditor, isViewer, loading, error, refresh }
 }
 
 export function useTripMembers(tripId) {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const load = useCallback(async () => {
-    if (!tripId) {
-      setLoading(false)
-      return
-    }
+  const refresh = async () => {
+    if (!tripId) return
     try {
-      setLoading(true)
       const data = await getTripMembers(tripId)
       setMembers(data)
     } catch (err) {
-      console.error('Failed to load trip members:', err)
-    } finally {
-      setLoading(false)
+      setError(err.message)
     }
-  }, [tripId])
+  }
 
   useEffect(() => {
-    load()
-  }, [load])
+    let ignore = false
+    const run = async () => {
+      if (!tripId) {
+        if (!ignore) setLoading(false)
+        return
+      }
+      try {
+        if (!ignore) setLoading(true)
+        const data = await getTripMembers(tripId)
+        if (!ignore) setMembers(data)
+      } catch (err) {
+        if (!ignore) setError(err.message)
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    run()
+    return () => { ignore = true }
+  }, [tripId])
 
-  return { members, loading, refresh: load }
+  return { members, loading, error, refresh }
 }

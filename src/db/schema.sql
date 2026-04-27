@@ -248,7 +248,11 @@ ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.checkpoints ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.trip_members ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own profile" ON public.users
+  FOR SELECT USING (id = auth.uid());
 
 -- Helper: is user a member of this trip?
 CREATE OR REPLACE FUNCTION public.is_trip_member(trip_uuid uuid)

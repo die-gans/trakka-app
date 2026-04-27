@@ -1,7 +1,8 @@
+import { memo } from 'react'
 import { Search, LogOut } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
-export function TopBar({ tripName, families, activeFamily, onFamilyChange, searchQuery, onSearchChange, onSignOut }) {
+export const TopBar = memo(function TopBar({ tripName, families, activeFamily, onFamilyChange, searchQuery, onSearchChange, onSignOut }) {
   return (
     <div className="flex h-12 items-center justify-between border-b border-border-default bg-bg-surface px-6">
       {/* Left: classification + trip name */}
@@ -68,4 +69,4 @@ export function TopBar({ tripName, families, activeFamily, onFamilyChange, searc
       </div>
     </div>
   )
-}
+})

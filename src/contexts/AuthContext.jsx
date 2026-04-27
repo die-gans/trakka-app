@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { supabase, onAuthStateChange } from '../lib/supabase'
 
-const DEV_BYPASS = import.meta.env.VITE_DEV_AUTH_BYPASS === 'true'
+const DEV_BYPASS = import.meta.env.DEV && import.meta.env.VITE_DEV_AUTH_BYPASS === 'true'
 
 const AuthContext = createContext(null)
 
@@ -63,7 +63,7 @@ export function AuthProvider({ children }) {
 
     // Listen for auth changes
     const { data: { subscription } } = onAuthStateChange((event, session) => {
-      console.log('AuthContext: onAuthStateChange event:', event, 'session:', session?.user?.id)
+      // Auth state change handled silently
       setSession(session)
       setUser(session?.user ?? null)
       setAuthError(null)
@@ -89,6 +89,7 @@ export function AuthProvider({ children }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext)
   if (!context) {

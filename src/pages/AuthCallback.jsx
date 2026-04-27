@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
 
 export function AuthCallback() {
   const navigate = useNavigate()
@@ -12,7 +11,7 @@ export function AuthCallback() {
   useEffect(() => {
     // If the user is authenticated, redirect them to the dashboard
     if (isAuthenticated) {
-      console.log('AuthCallback: User is authenticated, navigating home')
+      // Auth successful, navigating home
       navigate('/', { replace: true })
       return
     }
@@ -21,7 +20,7 @@ export function AuthCallback() {
     const params = new URLSearchParams(location.search)
     const errorDescription = params.get('error_description')
     if (errorDescription) {
-      setLocalError(errorDescription)
+      requestAnimationFrame(() => setLocalError(errorDescription))
       return
     }
 
@@ -31,7 +30,7 @@ export function AuthCallback() {
     const timeoutId = setTimeout(() => {
       // After 4 seconds, if still not authenticated, kick back to login
       if (!isAuthenticated) {
-        console.warn('AuthCallback: Timeout waiting for session. Redirecting to login.')
+        // Timeout waiting for session, redirecting to login
         navigate('/login', { replace: true })
       }
     }, 4000)

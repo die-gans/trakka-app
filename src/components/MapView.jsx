@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, memo } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { SectionTitle } from './ui/SectionTitle'
@@ -23,6 +23,16 @@ const TONE_MAP = {
 const DAY_IDS = ['thu', 'fri', 'sat', 'sun']
 const SLOTS_PER_DAY = 4
 
+function escapeHtml(str) {
+  if (typeof str !== 'string') return String(str ?? '')
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
 function createMarkerElement(html) {
   const el = document.createElement('div')
   el.innerHTML = html
@@ -38,8 +48,9 @@ function createBasecampMarker() {
 }
 
 function createFamilyMarker(short, color) {
+  const safeShort = escapeHtml(short)
   return createMarkerElement(
-    `<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2px solid rgba(10,12,16,0.8);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.4);font-size:10px;font-weight:900;color:white;font-family:var(--font-mono),monospace;cursor:pointer;">${short}</div>`
+    `<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2px solid rgba(10,12,16,0.8);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.4);font-size:10px;font-weight:900;color:white;font-family:var(--font-mono),monospace;cursor:pointer;">${safeShort}</div>`
   )
 }
 
@@ -132,13 +143,15 @@ function getRouteProgress(cursorSlot, focusDay) {
   return (cursorSlot - dayStart) / SLOTS_PER_DAY
 }
 
-export function MapView({ tripMeta, families = [], locations = [], routes = [], directionsByRoute = {}, cursorSlot, isPlaying: playbackActive }) {
+export const MapView = memo(function MapView({ tripMeta, families = [], locations = [], routes = [], directionsByRoute = {}, cursorSlot, isPlaying: playbackActive }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
   const convoyMarkersRef = useRef([])
   const routeAnimDataRef = useRef([])
   const followingRef = useRef(false)
+  const directionsRef = useRef(directionsByRoute)
+  directionsRef.current = directionsByRoute
 
   // Initialize map
   useEffect(() => {
@@ -179,7 +192,7 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [], 
       // ── Route lines ──
       const buildRouteFeatures = (routeList) =>
         (routeList || []).map((r) => {
-          const dir = directionsByRoute[r.id]
+          const dir = directionsRef.current[r.id]
           const waypoints = r?.waypoints || r?.path || []
           const coords = dir?.geometry?.coordinates || waypoints.map((p) => [p.lng, p.lat])
           return {
@@ -231,7 +244,7 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [], 
       if (base?.lat != null && base?.lng != null) {
         const popup = new mapboxgl.Popup({ offset: 14 }).setHTML(
           `<div style="font-family:var(--font-sans),sans-serif;font-size:11px;color:#C9D1D9;">
-            <div style="font-weight:900;text-transform:uppercase;letter-spacing:0.08em;">${tripMeta?.basecampAddress || 'Basecamp'}</div>
+            <div style="font-weight:900;text-transform:uppercase;letter-spacing:0.08em;">${escapeHtml(tripMeta?.basecampAddress || 'Basecamp')}</div>
             <div style="color:#8B949E;margin-top:2px;">Basecamp</div>
           </div>`
         )
@@ -252,8 +265,8 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [], 
         const color = familyColors[idx % familyColors.length]
         const popup = new mapboxgl.Popup({ offset: 12 }).setHTML(
           `<div style="font-family:var(--font-sans),sans-serif;font-size:11px;color:#C9D1D9;">
-            <div style="font-weight:900;text-transform:uppercase;letter-spacing:0.08em;">${family.name || 'Family'}</div>
-            <div style="color:#8B949E;margin-top:2px;">${family.origin || ''}${family.drive_time || family.driveTime ? ' · ' + (family.drive_time || family.driveTime) : ''}${family.eta ? ' · ETA ' + family.eta : ''}</div>
+            <div style="font-weight:900;text-transform:uppercase;letter-spacing:0.08em;">${escapeHtml(family.name || 'Family')}</div>
+            <div style="color:#8B949E;margin-top:2px;">${escapeHtml(family.origin || '')}${family.drive_time || family.driveTime ? ' · ' + escapeHtml(family.drive_time || family.driveTime) : ''}${family.eta ? ' · ETA ' + escapeHtml(family.eta) : ''}</div>
           </div>`
         )
         const marker = new mapboxgl.Marker({ element: createFamilyMarker(short, color) })
@@ -270,8 +283,8 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [], 
         if (!coords) return
         const popup = new mapboxgl.Popup({ offset: 10 }).setHTML(
           `<div style="font-family:var(--font-sans),sans-serif;font-size:11px;color:#C9D1D9;">
-            <div style="font-weight:900;text-transform:uppercase;letter-spacing:0.08em;">${loc.title || loc.name || 'Location'}</div>
-            <div style="color:#8B949E;margin-top:2px;">${loc.address || ''}${loc.summary ? ' · ' + loc.summary : ''}</div>
+            <div style="font-weight:900;text-transform:uppercase;letter-spacing:0.08em;">${escapeHtml(loc.title || loc.name || 'Location')}</div>
+            <div style="color:#8B949E;margin-top:2px;">${escapeHtml(loc.address || '')}${loc.summary ? ' · ' + escapeHtml(loc.summary) : ''}</div>
           </div>`
         )
         const marker = new mapboxgl.Marker({ element: createLocationMarker(loc.category) })
@@ -296,7 +309,7 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [], 
       // ── Precompute convoy animation data ──
       const buildAnimData = (routeList) =>
         (routeList || []).map((r) => {
-          const dir = directionsByRoute[r.id]
+          const dir = directionsRef.current[r.id]
           const waypoints = r?.waypoints || r?.path || []
           const path = dir?.geometry
             ? dir.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }))
@@ -381,7 +394,7 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [], 
       const avgLat = activePositions.reduce((s, p) => s + p.lat, 0) / activePositions.length
       map.easeTo({ center: [avgLng, avgLat], duration: 300, easing: (t) => t })
     }
-  }, [cursorSlot, playbackActive, routes])
+  }, [cursorSlot, playbackActive, routes, directionsByRoute])
 
   // Update route geometry when Directions API results arrive
   useEffect(() => {
@@ -482,4 +495,4 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [], 
       </div>
     </div>
   )
-}
+})

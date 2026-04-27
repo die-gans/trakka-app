@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, MapPin, Route } from 'lucide-react'
 import { createTrip, createRoute } from '../lib/supabase-crud'
@@ -36,12 +36,12 @@ function PlaceAutocomplete({ value, onSelect, placeholder, disabled }) {
   const blurTimeout = useRef(null)
 
   useEffect(() => {
-    setQuery(value || '')
+    requestAnimationFrame(() => setQuery(value || ''))
   }, [value])
 
   useEffect(() => {
     if (!query.trim() || query.trim().length < 2) {
-      setSuggestions([])
+      requestAnimationFrame(() => setSuggestions([]))
       return
     }
 

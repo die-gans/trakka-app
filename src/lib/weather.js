@@ -50,7 +50,7 @@ function formatWeatherData(data) {
 /**
  * Fetch current weather for a location
  */
-export async function fetchWeather({ lat, lng, locationName }) {
+export async function fetchWeather({ lat, lng }) {
   // If no API key, return null and let caller use fallback
   if (!OPENWEATHER_API_KEY) {
     console.warn('TRAKKA: No weather API key configured')

@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { TripProvider } from './contexts/TripContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { PublicRoute } from './components/PublicRoute'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Login } from './pages/Login'
 import { Trips } from './pages/Trips'
 import { CreateTrip } from './pages/CreateTrip'
@@ -14,50 +15,52 @@ function App() {
     <AuthProvider>
       <TripProvider>
         <BrowserRouter>
-          <Routes>
-            {/* Public routes */}
-            <Route
-              path="/login"
-              element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              }
-            />
-            <Route path="/auth/callback" element={<AuthCallback />} />
+          <ErrorBoundary>
+            <Routes>
+              {/* Public routes */}
+              <Route
+                path="/login"
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                }
+              />
+              <Route path="/auth/callback" element={<AuthCallback />} />
 
-            {/* Protected routes */}
-            <Route
-              path="/trips"
-              element={
-                <ProtectedRoute>
-                  <Trips />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/trips/new"
-              element={
-                <ProtectedRoute>
-                  <CreateTrip />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/trips/:tripId"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
+              {/* Protected routes */}
+              <Route
+                path="/trips"
+                element={
+                  <ProtectedRoute>
+                    <Trips />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/trips/new"
+                element={
+                  <ProtectedRoute>
+                    <CreateTrip />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/trips/:tripId"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Redirect root to trips list */}
-            <Route path="/" element={<Navigate to="/trips" replace />} />
+              {/* Redirect root to trips list */}
+              <Route path="/" element={<Navigate to="/trips" replace />} />
 
-            {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/trips" replace />} />
-          </Routes>
+              {/* Catch-all */}
+              <Route path="*" element={<Navigate to="/trips" replace />} />
+            </Routes>
+          </ErrorBoundary>
         </BrowserRouter>
       </TripProvider>
     </AuthProvider>
