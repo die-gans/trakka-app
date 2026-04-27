@@ -100,6 +100,13 @@
   - Camera follow mode during playback ✅
   - Map controls (zoom, compass, fullscreen) ✅
 
+- [x] **Linked Entities** ✅
+  - `linked_entities` JSONB array on itinerary items
+  - Click any itinerary block → InspectorRail shows item details + linked entities
+  - Linked entity chips are clickable → navigate to that entity in InspectorRail
+  - Edit modal has multi-select picker for locations, meals, routes, tasks, expenses
+  - Seed data populated with realistic links (Depart Sydney → route, Hyams Beach → location + meal, etc.)
+
 - [ ] **Drive plan per family**
   - Stop-by-stop breakdown with ETAs
   - Pairs with map — families tab shows departure + stops
@@ -223,9 +230,10 @@ vercel --prod
 6. Pages are in `src/pages/` — Dashboard.jsx is the main view, Login.jsx is auth
 7. Run `npm run dev` to see the current state
 
-**Next recommended ticket:** Linked Entities — connect itinerary items to meals/locations/routes so clicking an itinerary block shows its linked entities in the InspectorRail. This completes the "command centre" data graph.
+**Next recommended ticket:** Drive plan per family — stop-by-stop breakdown with ETAs, pairs with map view.
 
 **Recently shipped:**
+- Linked Entities — itinerary items link to meals/locations/routes/tasks/expenses, clickable in InspectorRail
 - Mapbox integration with dark styling, route lines, cursor-synced convoy, camera follow, map controls
 - Timeline playback with cursor, scrubber, Mission Launch checkpoints
 - Daily Briefing modal per day

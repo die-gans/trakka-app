@@ -75,6 +75,7 @@
  * @property {string} color
  * @property {string} [status]
  * @property {string[]} [familyIds]
+ * @property {Array<{type: string, id: string}>} [linkedEntities]
  */
 
 /**

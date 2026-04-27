@@ -173,12 +173,14 @@ function MembersPanel({ members, membersLoading, isEditor, role }) {
 export default function InspectorRail({
   selectedEntity,
   onClearSelection,
+  onSelectEntity,
   tripId,
   families,
   meals,
   tasks,
   expenses,
   locations,
+  routes,
   members,
   membersLoading,
   isEditor,
@@ -238,6 +240,35 @@ export default function InspectorRail({
     return families.find((f) => f.id === entity.assigned_family_id)
   }, [entity, families])
 
+  // Resolve linked entities for itinerary items
+  const resolvedLinkedEntities = useMemo(() => {
+    if (entity?.type !== 'itinerary_item' || !entity.linked_entities?.length) return []
+    return entity.linked_entities.map((le) => {
+      let resolved = null
+      switch (le.type) {
+        case 'location':
+          resolved = locations?.find((l) => l.id === le.id)
+          break
+        case 'meal':
+          resolved = meals?.find((m) => m.id === le.id)
+          break
+        case 'route':
+          resolved = routes?.find((r) => r.id === le.id)
+          break
+        case 'task':
+          resolved = tasks?.find((t) => t.id === le.id)
+          break
+        case 'expense':
+          resolved = expenses?.find((e) => e.id === le.id)
+          break
+        case 'family':
+          resolved = families?.find((f) => f.id === le.id)
+          break
+      }
+      return { ...le, resolved, name: resolved?.title || resolved?.meal || resolved?.name || le.id }
+    }).filter((le) => le.resolved)
+  }, [entity, locations, meals, routes, tasks, expenses, families])
+
   // Default view: Members panel
   if (!entity) {
     return (
@@ -293,9 +324,7 @@ export default function InspectorRail({
     actionChips.push({
       icon: MapPin,
       label: 'Inspect location',
-      onClick: () => {
-        // Would need to support selecting locations
-      },
+      onClick: () => onSelectEntity?.('location', linkedLocation),
     })
   }
 
@@ -320,6 +349,17 @@ export default function InspectorRail({
     if (entity.amount !== null && entity.amount !== undefined) detailRows.push(['Amount', `$${Number(entity.amount).toFixed(2)}`])
     if (payerFamily) detailRows.push(['Payer', payerFamily.name])
     if (entity.allocation_mode) detailRows.push(['Split', entity.allocation_mode])
+  } else if (entity.type === 'location') {
+    if (entity.day_id && entity.day_id !== 'all') detailRows.push(['Day', entity.day_id.toUpperCase()])
+    if (entity.category) detailRows.push(['Category', entity.category.charAt(0).toUpperCase() + entity.category.slice(1)])
+    if (entity.address) detailRows.push(['Address', entity.address])
+  } else if (entity.type === 'itinerary_item') {
+    if (entity.day_id) detailRows.push(['Day', entity.day_id.toUpperCase()])
+    if (entity.row_id) detailRows.push(['Lane', entity.row_id.charAt(0).toUpperCase() + entity.row_id.slice(1)])
+    if (entity.start_slot !== undefined) detailRows.push(['Start', `${String(entity.start_slot).padStart(2, '0')}:00`])
+    if (entity.span) detailRows.push(['Duration', `${(entity.span || 1) * 6}h`])
+    const linkedFamilyNames = (entity.family_ids || []).map((fid) => families?.find((f) => f.id === fid)?.name).filter(Boolean)
+    if (linkedFamilyNames.length) detailRows.push(['Units', linkedFamilyNames.join(', ')])
   }
 
   const taskCompletion = relatedTasks.length
@@ -409,6 +449,39 @@ export default function InspectorRail({
             </div>
           )}
         </section>
+
+        {/* Linked entities for itinerary items */}
+        {entity.type === 'itinerary_item' && (
+          <section className="border border-border-default bg-bg-surface p-4">
+            <SectionTitle
+              eyebrow="Entity Graph"
+              title="Linked Entities"
+              meta={`${resolvedLinkedEntities.length}`}
+            />
+            {resolvedLinkedEntities.length > 0 ? (
+              <div className="space-y-2">
+                {resolvedLinkedEntities.map((le) => (
+                  <button
+                    key={`${le.type}-${le.id}`}
+                    type="button"
+                    onClick={() => onSelectEntity?.(le.type, le.resolved)}
+                    className="flex w-full items-center justify-between border border-border-default bg-bg-panel px-3 py-2 text-left transition-colors hover:border-info/40 hover:bg-bg-elevated/40"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-info">{le.type}</span>
+                      <span className="text-[11px] font-bold text-text-primary">{le.name}</span>
+                    </div>
+                    <ExternalLink size={12} className="text-text-secondary" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[11px] text-text-secondary">
+                No entities linked to this itinerary item. Edit the item to add links.
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Linked location for meals */}
         {linkedLocation && (

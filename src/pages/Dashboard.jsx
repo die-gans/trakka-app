@@ -48,7 +48,7 @@ import {
   updateItineraryItem,
   deleteItineraryItem,
 } from '../lib/supabase-crud'
-import { Plus, Trash2, Pencil, X, Play, Pause, RotateCcw, Gauge, FileText } from 'lucide-react'
+import { Plus, Trash2, Pencil, X, Play, Pause, RotateCcw, Gauge, FileText, Check } from 'lucide-react'
 
 function EmptyState({ title, subtitle }) {
   return (
@@ -569,6 +569,49 @@ function TasksView({ tripId, tasks, loading, onToggleStatus, onSelectEntity, isE
               />
             </FormField>
           </div>
+          {/* Linked Entities */}
+          <div className="border border-border-default bg-bg-panel p-3 space-y-2">
+            <div className="text-[9px] font-black uppercase tracking-[0.18em] text-info">Linked Entities</div>
+            {[
+              { label: 'Locations', source: locations || [], type: 'location', nameKey: 'title' },
+              { label: 'Meals', source: meals || [], type: 'meal', nameKey: 'meal' },
+              { label: 'Routes', source: routes || [], type: 'route', nameKey: 'id' },
+              { label: 'Tasks', source: tasks || [], type: 'task', nameKey: 'title' },
+              { label: 'Expenses', source: expenses || [], type: 'expense', nameKey: 'title' },
+            ].map(({ label, source, type, nameKey }) => (
+              source.length > 0 && (
+                <div key={type}>
+                  <div className="text-[10px] font-bold text-text-secondary mb-1">{label}</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {source.map((ent) => {
+                      const name = ent[nameKey] || ent.id
+                      const active = isLinked(type, ent.id)
+                      return (
+                        <button
+                          key={ent.id}
+                          type="button"
+                          onClick={() => toggleLinkedEntity(type, ent.id)}
+                          className={cn(
+                            'inline-flex items-center gap-1 border px-2 py-1 text-[10px] font-bold transition-colors',
+                            active
+                              ? 'border-info bg-info-soft text-info'
+                              : 'border-border-default bg-bg-surface text-text-secondary hover:border-info/40 hover:text-text-primary'
+                          )}
+                        >
+                          {active ? <Check size={10} /> : <Plus size={10} />}
+                          {name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            ))}
+            {![locations, meals, routes, tasks, expenses].some((arr) => arr?.length > 0) && (
+              <div className="text-[10px] text-text-muted">No entities available to link.</div>
+            )}
+          </div>
+
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={() => setModalOpen(false)} className="border border-border-default bg-bg-panel px-4 py-2 text-[11px] font-black uppercase tracking-wider text-text-secondary hover:text-text-primary">
               Cancel
@@ -807,10 +850,12 @@ function ItineraryView({
   tripId, items, loading, isEditor, families, onRefresh, tripMeta,
   cursorSlot, isPlaying, playbackSpeed,
   onTogglePlayback, onRestartPlayback, onSetPlaybackSpeed, onSetCursor, onOpenBriefing,
+  onSelectEntity,
+  meals, locations, routes, tasks, expenses,
 }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState({ title: '', day_id: 'thu', row_id: 'activities', start_slot: '0', span: '1', color: 'info' })
+  const [form, setForm] = useState({ title: '', day_id: 'thu', row_id: 'activities', start_slot: '0', span: '1', color: 'info', linked_entities: [] })
 
   const days = [
     { value: 'thu', label: 'Thu 4/09' },
@@ -861,6 +906,7 @@ function ItineraryView({
       start_slot: String(slotValue),
       span: '1',
       color: 'info',
+      linked_entities: [],
     })
     setModalOpen(true)
   }
@@ -874,6 +920,7 @@ function ItineraryView({
       start_slot: String(item.start_slot || 0),
       span: String(item.span || 1),
       color: item.color || 'info',
+      linked_entities: item.linked_entities || [],
     })
     setModalOpen(true)
   }
@@ -898,6 +945,18 @@ function ItineraryView({
       console.error('Failed to save itinerary item:', err)
     }
   }
+
+  const toggleLinkedEntity = (type, id) => {
+    const current = form.linked_entities || []
+    const exists = current.some((le) => le.type === type && le.id === id)
+    if (exists) {
+      setForm({ ...form, linked_entities: current.filter((le) => !(le.type === type && le.id === id)) })
+    } else {
+      setForm({ ...form, linked_entities: [...current, { type, id }] })
+    }
+  }
+
+  const isLinked = (type, id) => (form.linked_entities || []).some((le) => le.type === type && le.id === id)
 
   const handleDelete = async (id) => {
     try {
@@ -1062,8 +1121,9 @@ function ItineraryView({
                         return (
                           <div
                             key={item.id}
+                            onClick={() => onSelectEntity?.('itinerary_item', item)}
                             className={cn(
-                              'absolute top-1.5 bottom-1.5 border px-2 flex items-center gap-1 text-[10px] font-bold overflow-hidden group cursor-default z-10 transition-opacity',
+                              'absolute top-1.5 bottom-1.5 border px-2 flex items-center gap-1 text-[10px] font-bold overflow-hidden group cursor-pointer z-10 transition-opacity',
                               colorClasses[item.color] || colorClasses.info,
                               isPast && !isCurrent && 'opacity-40',
                               isCurrent && 'ring-1 ring-info/50'
@@ -1596,6 +1656,12 @@ export function Dashboard() {
             onSetPlaybackSpeed={setPlaybackSpeed}
             onSetCursor={handleSetCursor}
             onOpenBriefing={(dayId) => { setBriefingDayId(dayId); setBriefingOpen(true) }}
+            onSelectEntity={handleSelectEntity}
+            meals={meals}
+            locations={locations}
+            routes={routes}
+            tasks={tasks}
+            expenses={expenses}
           />
         )
       case 'map':
@@ -1683,12 +1749,14 @@ export function Dashboard() {
           <InspectorRail
             selectedEntity={selectedEntity}
             onClearSelection={handleClearSelection}
+            onSelectEntity={handleSelectEntity}
             tripId={tripId}
             families={families}
             meals={meals}
             tasks={tasks}
             expenses={expenses}
             locations={locations}
+            routes={routes}
             members={members}
             membersLoading={membersLoading}
             isEditor={isEditor}
