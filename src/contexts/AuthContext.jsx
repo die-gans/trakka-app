@@ -24,6 +24,23 @@ export function AuthProvider({ children }) {
           if (!error) {
             setSession(data.session)
             setUser(data.user)
+          } else {
+            console.warn('Dev bypass: Anonymous sign-in failed, falling back to local mock.', error)
+            // Local mock user for development
+            const mockUser = {
+              id: '00000000-0000-0000-0000-000000000000',
+              email: 'dev@trakka.app',
+              user_metadata: { full_name: 'Dev User' },
+              role: 'authenticated'
+            }
+            const mockSession = {
+              user: mockUser,
+              access_token: 'mock-token',
+              refresh_token: 'mock-refresh-token',
+              expires_at: Math.floor(Date.now() / 1000) + 3600
+            }
+            setSession(mockSession)
+            setUser(mockUser)
           }
         }
         setLoading(false)

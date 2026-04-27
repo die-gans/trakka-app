@@ -6,11 +6,12 @@
 export const TRIP_META = {
   id: 'trip-jervis-bay-2026',
   title: 'Jervis Bay Long Weekend',
-  commandName: 'Jervis Bay Command Centre',
-  startDate: '2026-04-09',
-  endDate: '2026-04-12',
-  basecampAddress: 'Jervis Bay, NSW 2540',
-  basecampCoordinates: { lat: -35.1333, lng: 150.7000 },
+  command_name: 'Jervis Bay Command Centre',
+  start_date: '2026-04-09',
+  end_date: '2026-04-12',
+  basecamp_address: 'Jervis Bay, NSW 2540',
+  basecamp_lat: -35.1333,
+  basecamp_lng: 150.7000,
 }
 
 export const DAYS = [
@@ -213,4 +214,14 @@ export const INITIAL_TASKS = [
   { id: 'task-eskies', title: 'Pack eskies + ice', dayId: 'thu', status: 'open', assignedFamilyId: 'sydney-crew' },
   { id: 'task-snorkel', title: 'Check snorkel gear fits kids', dayId: 'fri', status: 'open', assignedFamilyId: 'melbourne-crew' },
   { id: 'task-coffee', title: 'Grind coffee beans', dayId: 'fri', status: 'open', assignedFamilyId: 'canberra-crew' },
+]
+
+export const INITIAL_ITINERARY_ITEMS = [
+  { id: 'item-1', trip_id: 'trip-jervis-bay-2026', title: 'Depart Sydney', day_id: 'thu', row_id: 'transport', start_slot: 6, span: 1, color: 'info', family_ids: ['sydney-crew'] },
+  { id: 'item-2', trip_id: 'trip-jervis-bay-2026', title: 'Depart Melbourne', day_id: 'thu', row_id: 'transport', start_slot: 0, span: 2, color: 'warning', family_ids: ['melbourne-crew'] },
+  { id: 'item-3', trip_id: 'trip-jervis-bay-2026', title: 'Depart Canberra', day_id: 'thu', row_id: 'transport', start_slot: 12, span: 1, color: 'success', family_ids: ['canberra-crew'] },
+  { id: 'item-4', trip_id: 'trip-jervis-bay-2026', title: 'Basecamp Setup', day_id: 'thu', row_id: 'ops', start_slot: 18, span: 1, color: 'info', family_ids: ['sydney-crew', 'melbourne-crew', 'canberra-crew'] },
+  { id: 'item-5', trip_id: 'trip-jervis-bay-2026', title: 'Hyams Beach Swim', day_id: 'fri', row_id: 'activity', start_slot: 12, span: 1, color: 'success', family_ids: ['sydney-crew', 'melbourne-crew', 'canberra-crew'] },
+  { id: 'item-6', trip_id: 'trip-jervis-bay-2026', title: 'Huskisson Pub', day_id: 'fri', row_id: 'food', start_slot: 18, span: 1, color: 'warning', family_ids: ['sydney-crew', 'melbourne-crew', 'canberra-crew'] },
+  { id: 'item-7', trip_id: 'trip-jervis-bay-2026', title: 'Booderee Run', day_id: 'sat', row_id: 'activity', start_slot: 6, span: 2, color: 'critical', family_ids: ['sydney-crew', 'melbourne-crew', 'canberra-crew'] },
 ]

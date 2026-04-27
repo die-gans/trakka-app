@@ -1,12 +1,25 @@
 import { supabase } from './supabase'
+import {
+  TRIP_META,
+  INITIAL_FAMILIES,
+  INITIAL_MEALS,
+  INITIAL_TASKS,
+  INITIAL_EXPENSES,
+  INITIAL_LOCATIONS,
+  INITIAL_ROUTES,
+  INITIAL_ITINERARY_ITEMS,
+} from '../data/seedTrip'
 
 const DEV_BYPASS = import.meta.env.VITE_DEV_AUTH_BYPASS === 'true'
+const MOCK_TRIP_ID = TRIP_META.id
 
 // ============================================
 // TRIPS
 // ============================================
 
 export async function getTrip(tripId) {
+  if (tripId === MOCK_TRIP_ID) return TRIP_META
+
   const { data, error } = await supabase
     .from('trips')
     .select('*')
@@ -17,21 +30,33 @@ export async function getTrip(tripId) {
 }
 
 export async function getTripsForUser() {
+  let trips = []
+  if (DEV_BYPASS) {
+    trips.push(TRIP_META)
+  }
+
   const { data: { session } } = await supabase.auth.getSession()
   const user = session?.user
-  if (!user) return []
+  if (!user) return trips
 
-  const { data, error } = await supabase
-    .from('trips')
-    .select(`
-      *,
-      trip_members!inner(user_id)
-    `)
-    .eq('trip_members.user_id', user.id)
-    .order('created_at', { ascending: false })
+  try {
+    const { data, error } = await supabase
+      .from('trips')
+      .select(`
+        *,
+        trip_members!inner(user_id)
+      `)
+      .eq('trip_members.user_id', user.id)
+      .order('created_at', { ascending: false })
 
-  if (error) throw error
-  return data || []
+    if (!error && data) {
+      trips = [...trips, ...data]
+    }
+  } catch (err) {
+    console.warn('Supabase fetch failed, using fallback:', err)
+  }
+
+  return trips
 }
 
 export async function createTrip(trip) {
@@ -63,6 +88,8 @@ export async function createTrip(trip) {
 // ============================================
 
 export async function getFamilies(tripId) {
+  if (tripId === MOCK_TRIP_ID) return INITIAL_FAMILIES
+
   const { data, error } = await supabase
     .from('families')
     .select(`
@@ -116,6 +143,8 @@ export async function toggleChecklistItem(itemId, done) {
 // ============================================
 
 export async function getMeals(tripId) {
+  if (tripId === MOCK_TRIP_ID) return INITIAL_MEALS
+
   const { data, error } = await supabase
     .from('meals')
     .select('*')
@@ -159,6 +188,8 @@ export async function deleteMeal(id) {
 // ============================================
 
 export async function getTasks(tripId) {
+  if (tripId === MOCK_TRIP_ID) return INITIAL_TASKS
+
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
@@ -202,6 +233,8 @@ export async function deleteTask(id) {
 // ============================================
 
 export async function getExpenses(tripId) {
+  if (tripId === MOCK_TRIP_ID) return INITIAL_EXPENSES
+
   const { data, error } = await supabase
     .from('expenses')
     .select('*')
@@ -249,6 +282,8 @@ export async function deleteExpense(id) {
 // ============================================
 
 export async function getLocations(tripId) {
+  if (tripId === MOCK_TRIP_ID) return INITIAL_LOCATIONS
+
   const { data, error } = await supabase
     .from('locations')
     .select('*')
@@ -264,6 +299,8 @@ export async function getLocations(tripId) {
 // ============================================
 
 export async function getItineraryItems(tripId) {
+  if (tripId === MOCK_TRIP_ID) return INITIAL_ITINERARY_ITEMS
+
   const { data, error } = await supabase
     .from('itinerary_items')
     .select(`
@@ -334,6 +371,8 @@ export async function deleteItineraryItem(id) {
 // ============================================
 
 export async function getRoutes(tripId) {
+  if (tripId === MOCK_TRIP_ID) return INITIAL_ROUTES
+
   const { data, error } = await supabase
     .from('routes')
     .select('*')
@@ -349,7 +388,7 @@ export async function getRoutes(tripId) {
 // ============================================
 
 export async function getTripMembers(tripId) {
-  if (DEV_BYPASS) {
+  if (DEV_BYPASS || tripId === MOCK_TRIP_ID) {
     return [{
       id: 'dev-member-001',
       trip_id: tripId,
@@ -374,7 +413,7 @@ export async function getTripMembers(tripId) {
 }
 
 export async function getMyTripPermission(tripId) {
-  if (DEV_BYPASS) {
+  if (DEV_BYPASS || tripId === MOCK_TRIP_ID) {
     return { permission: 'editor', role: 'organizer' }
   }
 
@@ -422,6 +461,10 @@ export async function inviteMember(tripId, userId, permission = 'viewer') {
 // ============================================
 
 export function subscribeToTable(table, filter, callback) {
+  if (filter && filter.includes(MOCK_TRIP_ID)) {
+    return { unsubscribe: () => {} } // No-op for mock data
+  }
+
   const channel = supabase
     .channel(`${table}_changes`)
     .on(

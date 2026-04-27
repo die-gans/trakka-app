@@ -128,15 +128,27 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [] }
   useEffect(() => {
     if (!TOKEN || !containerRef.current || mapRef.current) return
 
-    const map = new mapboxgl.Map({
-      container: containerRef.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
-      center: [150.7, -35.13],
-      zoom: 6,
-      attributionControl: false,
-    })
+    try {
+      // Mapbox GL JS requires a public token (pk.xxxx). 
+      // If a secret token (sk.xxxx) is provided, initialization may fail.
+      mapboxgl.accessToken = TOKEN
+      
+      const map = new mapboxgl.Map({
+        container: containerRef.current,
+        style: 'mapbox://styles/mapbox/dark-v11',
+        center: [150.7, -35.13],
+        zoom: 6,
+        attributionControl: false,
+      })
 
-    mapRef.current = map
+      mapRef.current = map
+    } catch (err) {
+      console.error('TRAKKA: Failed to initialize Mapbox GL:', err)
+      return
+    }
+
+    const map = mapRef.current
+    if (!map) return
 
     map.on('load', () => {
       // ── Route lines ──

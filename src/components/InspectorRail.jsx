@@ -202,27 +202,6 @@ export default function InspectorRail({
     return () => window.clearTimeout(timerId)
   }, [entity?.id, entity?.type])
 
-  // Default view: Members panel
-  if (!entity) {
-    return (
-      <aside className="hidden w-80 flex-col border-l border-border-default bg-bg-surface xl:flex">
-        <div className="border-b border-border-default bg-bg-panel p-4">
-          <div className="text-[12px] font-black uppercase tracking-[0.14em] text-text-primary">
-            Inspector
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          <MembersPanel
-            members={members}
-            membersLoading={membersLoading}
-            isEditor={isEditor}
-            role={role}
-          />
-        </div>
-      </aside>
-    )
-  }
-
   // Resolve related data based on entity type
   const relatedTasks = useMemo(() => {
     if (!entity) return []
@@ -258,6 +237,27 @@ export default function InspectorRail({
     if (entity?.type !== 'task' || !entity.assigned_family_id) return null
     return families.find((f) => f.id === entity.assigned_family_id)
   }, [entity, families])
+
+  // Default view: Members panel
+  if (!entity) {
+    return (
+      <aside className="hidden w-80 flex-col border-l border-border-default bg-bg-surface xl:flex">
+        <div className="border-b border-border-default bg-bg-panel p-4">
+          <div className="text-[12px] font-black uppercase tracking-[0.14em] text-text-primary">
+            Inspector
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <MembersPanel
+            members={members}
+            membersLoading={membersLoading}
+            isEditor={isEditor}
+            role={role}
+          />
+        </div>
+      </aside>
+    )
+  }
 
   // Build action chips
   const actionChips = []
