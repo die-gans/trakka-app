@@ -45,7 +45,10 @@ export async function signInWithGoogle() {
     throw error
   }
 
-  return data
+  // Supabase v2 returns the OAuth URL — we must navigate to it
+  if (data?.url) {
+    window.location.href = data.url
+  }
 }
 
 /**
