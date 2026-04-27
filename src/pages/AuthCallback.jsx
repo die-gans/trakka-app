@@ -5,8 +5,16 @@ import { useAuth } from '../contexts/AuthContext'
 
 export function AuthCallback() {
   const navigate = useNavigate()
-  const { setAuthError } = useAuth()
+  const { setAuthError, isAuthenticated } = useAuth()
   const [error, setError] = useState(null)
+
+  useEffect(() => {
+    // If we're already authenticated, or just became authenticated, go home
+    if (isAuthenticated) {
+      console.log('AuthCallback: Authenticated, navigating home')
+      navigate('/', { replace: true })
+    }
+  }, [isAuthenticated, navigate])
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -16,24 +24,31 @@ export function AuthCallback() {
         const code = params.get('code')
 
         if (!code) {
+          console.warn('AuthCallback: No code in URL')
           // No code present — redirect to login
           navigate('/login', { replace: true })
           return
         }
 
+        console.log('AuthCallback: Exchanging code for session...')
         await exchangeCodeForSession(code)
-        // Success — redirect to dashboard
-        navigate('/', { replace: true })
+        console.log('AuthCallback: Code exchange complete. Waiting for AuthContext...')
+        // Success — we don't navigate immediately here.
+        // We let the useEffect(isAuthenticated) handle the navigation 
+        // to ensure the rest of the app "sees" the login.
       } catch (err) {
-        console.error('Auth callback error:', err)
+        console.error('AuthCallback error:', err)
         const message = err.message || 'Failed to sign in'
         setError(message)
         setAuthError(message)
       }
     }
 
-    handleCallback()
-  }, [navigate, setAuthError])
+    // Only run if not already authenticated
+    if (!isAuthenticated) {
+      handleCallback()
+    }
+  }, [navigate, setAuthError, isAuthenticated])
 
   if (error) {
     return (

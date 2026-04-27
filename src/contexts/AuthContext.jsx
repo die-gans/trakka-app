@@ -56,10 +56,12 @@ export function AuthProvider({ children }) {
     })
 
     // Listen for auth changes
-    const { data: { subscription } } = onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = onAuthStateChange((event, session) => {
+      console.log('AuthContext: onAuthStateChange event:', event, 'session:', session?.user?.id)
       setSession(session)
       setUser(session?.user ?? null)
       setAuthError(null)
+      setLoading(false)
     })
 
     return () => subscription.unsubscribe()

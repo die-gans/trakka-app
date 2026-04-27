@@ -17,6 +17,7 @@ export function ProtectedRoute({ children }) {
 
   if (!isAuthenticated) {
     // Redirect to login, but save where they were going
+    console.log('ProtectedRoute: Access denied to', location.pathname, '- Redirecting to /login')
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
   }
 
