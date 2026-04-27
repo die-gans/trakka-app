@@ -281,13 +281,15 @@ export function useDirections(route) {
   const [error, setError] = useState(null)
   const fetchedRef = useRef(false)
 
+  const waypoints = route?.waypoints || route?.path || []
+
   useEffect(() => {
-    if (!route?.waypoints || route.waypoints.length < 2) return
+    if (!waypoints || waypoints.length < 2) return
     if (fetchedRef.current) return
 
     let cancelled = false
     setLoading(true)
-    fetchDirections(route.waypoints).then((data) => {
+    fetchDirections(waypoints).then((data) => {
       if (cancelled) return
       if (data) {
         setResult(data)
@@ -301,7 +303,7 @@ export function useDirections(route) {
     })
 
     return () => { cancelled = true }
-  }, [route?.id, route?.waypoints])
+  }, [route?.id, waypoints])
 
   return { ...result, loading, error }
 }
@@ -313,14 +315,18 @@ export function useAllDirections(routes) {
   useEffect(() => {
     if (!routes?.length) return
 
-    const toFetch = routes.filter((r) => r?.waypoints && r.waypoints.length >= 2 && !fetchedRef.current.has(r.id))
+    const toFetch = routes.filter((r) => {
+      const waypoints = r?.waypoints || r?.path || []
+      return waypoints.length >= 2 && !fetchedRef.current.has(r.id)
+    })
     if (toFetch.length === 0) return
 
     let cancelled = false
 
     Promise.all(
       toFetch.map(async (route) => {
-        const data = await fetchDirections(route.waypoints)
+        const waypoints = route?.waypoints || route?.path || []
+        const data = await fetchDirections(waypoints)
         return { id: route.id, data }
       })
     ).then((fetched) => {

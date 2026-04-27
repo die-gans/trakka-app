@@ -180,7 +180,8 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [], 
       const buildRouteFeatures = (routeList) =>
         (routeList || []).map((r) => {
           const dir = directionsByRoute[r.id]
-          const coords = dir?.geometry?.coordinates || (r.path || []).map((p) => [p.lng, p.lat])
+          const waypoints = r?.waypoints || r?.path || []
+          const coords = dir?.geometry?.coordinates || waypoints.map((p) => [p.lng, p.lat])
           return {
             type: 'Feature',
             properties: {
@@ -296,9 +297,10 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [], 
       const buildAnimData = (routeList) =>
         (routeList || []).map((r) => {
           const dir = directionsByRoute[r.id]
+          const waypoints = r?.waypoints || r?.path || []
           const path = dir?.geometry
             ? dir.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }))
-            : r.path || []
+            : waypoints
           const { distances, total } = getPathDistances(path)
           return { path, distances, total }
         })
@@ -390,7 +392,8 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [], 
 
     const routeFeatures = (routes || []).map((r) => {
       const dir = directionsByRoute[r.id]
-      const coords = dir?.geometry?.coordinates || (r.path || []).map((p) => [p.lng, p.lat])
+      const waypoints = r?.waypoints || r?.path || []
+      const coords = dir?.geometry?.coordinates || waypoints.map((p) => [p.lng, p.lat])
       return {
         type: 'Feature',
         properties: {
@@ -410,9 +413,10 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [], 
     // Recompute convoy animation data with real geometry
     routeAnimDataRef.current = (routes || []).map((r) => {
       const dir = directionsByRoute[r.id]
+      const waypoints = r?.waypoints || r?.path || []
       const path = dir?.geometry
         ? dir.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }))
-        : r.path || []
+        : waypoints
       const { distances, total } = getPathDistances(path)
       return { path, distances, total }
     })

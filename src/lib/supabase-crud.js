@@ -383,6 +383,17 @@ export async function getRoutes(tripId) {
   return data || []
 }
 
+export async function createRoute(route) {
+  const { data, error } = await supabase
+    .from('routes')
+    .insert(route)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
 // ============================================
 // TRIP MEMBERS & PERMISSIONS
 // ============================================

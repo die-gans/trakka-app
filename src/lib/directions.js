@@ -10,7 +10,9 @@ const CACHE = new Map()
 export async function fetchDirections(waypoints) {
   if (!TOKEN || !waypoints || waypoints.length < 2) return null
 
-  const coordsKey = waypoints.map((w) => `${w.lng},${w.lat}`).join(';')
+  // Strip names for API call, keep coords only
+  const coords = waypoints.map((w) => ({ lat: w.lat, lng: w.lng }))
+  const coordsKey = coords.map((w) => `${w.lng},${w.lat}`).join(';')
   if (CACHE.has(coordsKey)) return CACHE.get(coordsKey)
 
   const url = new URL(`https://api.mapbox.com/directions/v5/mapbox/driving/${coordsKey}.json`)
