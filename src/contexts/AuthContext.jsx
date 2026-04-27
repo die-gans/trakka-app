@@ -50,8 +50,14 @@ export function AuthProvider({ children }) {
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
+      setSession((prev) => {
+        if (prev && !session) return prev // Don't overwrite active session with null
+        return session
+      })
+      setUser((prev) => {
+        if (prev && !session?.user) return prev
+        return session?.user ?? null
+      })
       setLoading(false)
     })
 
