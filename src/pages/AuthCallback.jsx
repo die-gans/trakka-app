@@ -1,41 +1,49 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { exchangeCodeForSession } from '../lib/supabase'
+import { exchangeCodeForSession, supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 
 export function AuthCallback() {
   const navigate = useNavigate()
-  const { setAuthError, isAuthenticated } = useAuth()
+  const { setAuthError } = useAuth()
   const [error, setError] = useState(null)
+  const handled = useRef(false)
 
   useEffect(() => {
-    // If we're already authenticated, or just became authenticated, go home
-    if (isAuthenticated) {
-      console.log('AuthCallback: Authenticated, navigating home')
-      navigate('/', { replace: true })
-    }
-  }, [isAuthenticated, navigate])
+    if (handled.current) return
+    handled.current = true
 
-  useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Get code from URL query params
         const params = new URLSearchParams(window.location.search)
         const code = params.get('code')
 
+        // If no code in URL, check if we already have a session (e.g. page refresh after exchange)
         if (!code) {
-          console.warn('AuthCallback: No code in URL')
-          // No code present — redirect to login
-          navigate('/login', { replace: true })
+          console.log('AuthCallback: No code in URL, checking existing session...')
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            console.log('AuthCallback: Existing session found, navigating home')
+            navigate('/', { replace: true })
+          } else {
+            console.warn('AuthCallback: No code and no session — redirecting to login')
+            navigate('/login', { replace: true })
+          }
           return
         }
 
         console.log('AuthCallback: Exchanging code for session...')
         await exchangeCodeForSession(code)
-        console.log('AuthCallback: Code exchange complete. Waiting for AuthContext...')
-        // Success — we don't navigate immediately here.
-        // We let the useEffect(isAuthenticated) handle the navigation 
-        // to ensure the rest of the app "sees" the login.
+
+        // Verify the session was actually established
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          console.log('AuthCallback: Session confirmed, navigating home')
+          navigate('/', { replace: true })
+        } else {
+          console.error('AuthCallback: Code exchanged but no session found')
+          throw new Error('Authentication succeeded but session was not established. Please try again.')
+        }
       } catch (err) {
         console.error('AuthCallback error:', err)
         const message = err.message || 'Failed to sign in'
@@ -44,11 +52,8 @@ export function AuthCallback() {
       }
     }
 
-    // Only run if not already authenticated
-    if (!isAuthenticated) {
-      handleCallback()
-    }
-  }, [navigate, setAuthError, isAuthenticated])
+    handleCallback()
+  }, [navigate, setAuthError])
 
   if (error) {
     return (
