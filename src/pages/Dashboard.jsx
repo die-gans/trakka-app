@@ -20,8 +20,10 @@ import {
   useLocations,
   useRoutes,
   useItineraryItems,
+  useAllDirections,
 } from '../hooks/useTripData'
 import { DAYS, TIME_SLOTS } from '../data/seedTrip'
+import { formatDuration, formatDistance } from '../lib/directions'
 import {
   clampTimelineCursor,
   buildOperationCheckpoints,
@@ -48,7 +50,7 @@ import {
   updateItineraryItem,
   deleteItineraryItem,
 } from '../lib/supabase-crud'
-import { Plus, Trash2, Pencil, X, Play, Pause, RotateCcw, Gauge, FileText, Check } from 'lucide-react'
+import { Plus, Trash2, Pencil, X, Play, Pause, RotateCcw, Gauge, FileText, Check, ChevronDown, ChevronUp, Route } from 'lucide-react'
 
 function EmptyState({ title, subtitle }) {
   return (
@@ -115,8 +117,103 @@ function SelectField({ value, onChange, options, placeholder }) {
   )
 }
 
+/* ─── Drive Plan (per family) ─── */
+function DrivePlan({ family, routes, directionsByRoute }) {
+  const [expanded, setExpanded] = useState(false)
+  const route = routes?.find((r) => r.familyId === family.id || r.family_id === family.id)
+  const dir = route ? directionsByRoute?.[route.id] : null
+  const waypoints = route?.waypoints || []
+  const legs = dir?.legs || []
+
+  if (waypoints.length < 2) return null
+
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
+        className="flex w-full items-center justify-between border border-border-default bg-bg-panel px-3 py-2 text-left transition-colors hover:border-info/40"
+      >
+        <div className="flex items-center gap-2">
+          <Route size={13} className="text-info" />
+          <span className="text-[10px] font-black uppercase tracking-wider text-text-secondary">Drive Plan</span>
+          {dir && (
+            <span className="text-[10px] font-bold text-text-primary">
+              {formatDistance(dir.distanceMeters)} · {formatDuration(dir.durationSeconds)}
+            </span>
+          )}
+        </div>
+        {expanded ? <ChevronUp size={13} className="text-text-secondary" /> : <ChevronDown size={13} className="text-text-secondary" />}
+      </button>
+
+      {expanded && (
+        <div className="border border-t-0 border-border-default bg-bg-surface p-3">
+          {/* Waypoint timeline */}
+          <div className="space-y-0">
+            {waypoints.map((wp, idx) => {
+              const isLast = idx === waypoints.length - 1
+              const leg = legs[idx]
+              const prevLegsDuration = legs.slice(0, idx).reduce((s, l) => s + (l?.duration || 0), 0)
+              const cumulativeMin = Math.round(prevLegsDuration / 60)
+              const hour = Math.floor(cumulativeMin / 60)
+              const min = cumulativeMin % 60
+              const eta = idx === 0 ? 'Departure' : `+${hour > 0 ? `${hour}h ` : ''}${min}m`
+
+              return (
+                <div key={idx} className="flex gap-3">
+                  {/* Timeline line */}
+                  <div className="flex flex-col items-center">
+                    <div className={cn(
+                      'h-2.5 w-2.5 rounded-full border-2',
+                      idx === 0 ? 'border-success bg-success-soft' : isLast ? 'border-info bg-info-soft' : 'border-warning bg-warning-soft'
+                    )} />
+                    {!isLast && <div className="mt-1 w-px flex-1 bg-border-default/50" />}
+                  </div>
+                  {/* Content */}
+                  <div className={cn('pb-3', isLast && 'pb-0')}>
+                    <div className="text-[11px] font-bold text-text-primary">{wp.name}</div>
+                    <div className="text-[10px] text-text-secondary">
+                      {eta}
+                      {leg && (
+                        <span className="ml-2">
+                          {formatDistance(leg.distance)} · {formatDuration(leg.duration)}
+                        </span>
+                      )}
+                    </div>
+                    {leg?.summary && (
+                      <div className="mt-0.5 text-[9px] text-text-muted">{leg.summary}</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Total */}
+          {dir && (
+            <div className="mt-2 border-t border-border-default/50 pt-2">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="font-black uppercase tracking-wider text-text-secondary">Total</span>
+                <span className="font-bold text-text-primary">
+                  {formatDistance(dir.distanceMeters)} · {formatDuration(dir.durationSeconds)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {!dir && (
+            <div className="mt-2 text-[10px] text-text-muted">
+              Calculating route...
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ─── Families View ─── */
-function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness, onSelectEntity, isEditor }) {
+function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness, onSelectEntity, isEditor, routes, directionsByRoute }) {
   if (loading) {
     return (
       <div className="p-6">
@@ -231,6 +328,8 @@ function FamiliesView({ families, loading, onToggleChecklist, onUpdateReadiness,
                 </div>
               </div>
             )}
+
+            <DrivePlan family={family} routes={routes} directionsByRoute={directionsByRoute} />
           </button>
         ))}
       </div>
@@ -1497,6 +1596,8 @@ export function Dashboard() {
     loading: routesLoading,
   } = useRoutes(tripId)
 
+  const directionsByRoute = useAllDirections(routes)
+
   const {
     items: itineraryItems,
     loading: itineraryLoading,
@@ -1624,6 +1725,8 @@ export function Dashboard() {
             onUpdateReadiness={updateReadiness}
             onSelectEntity={handleSelectEntity}
             isEditor={isEditor}
+            routes={routes}
+            directionsByRoute={directionsByRoute}
           />
         )
       case 'meals':
@@ -1671,6 +1774,7 @@ export function Dashboard() {
             families={families}
             locations={locations}
             routes={routes}
+            directionsByRoute={directionsByRoute}
             cursorSlot={cursorSlot}
             isPlaying={isPlaying}
           />
@@ -1757,6 +1861,7 @@ export function Dashboard() {
             expenses={expenses}
             locations={locations}
             routes={routes}
+            directionsByRoute={directionsByRoute}
             members={members}
             membersLoading={membersLoading}
             isEditor={isEditor}

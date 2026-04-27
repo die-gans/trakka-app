@@ -132,7 +132,7 @@ function getRouteProgress(cursorSlot, focusDay) {
   return (cursorSlot - dayStart) / SLOTS_PER_DAY
 }
 
-export function MapView({ tripMeta, families = [], locations = [], routes = [], cursorSlot, isPlaying: playbackActive }) {
+export function MapView({ tripMeta, families = [], locations = [], routes = [], directionsByRoute = {}, cursorSlot, isPlaying: playbackActive }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
@@ -177,18 +177,25 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [], 
       styleControlButtons()
 
       // ── Route lines ──
-      const routeFeatures = (routes || []).map((r) => ({
-        type: 'Feature',
-        properties: {
-          tone: r.tone || 'info',
-          familyId: r.family_id || r.familyId,
-          focusDay: r.focus_day || r.focusDay,
-        },
-        geometry: {
-          type: 'LineString',
-          coordinates: (r.path || []).map((p) => [p.lng, p.lat]),
-        },
-      }))
+      const buildRouteFeatures = (routeList) =>
+        (routeList || []).map((r) => {
+          const dir = directionsByRoute[r.id]
+          const coords = dir?.geometry?.coordinates || (r.path || []).map((p) => [p.lng, p.lat])
+          return {
+            type: 'Feature',
+            properties: {
+              tone: r.tone || 'info',
+              familyId: r.family_id || r.familyId,
+              focusDay: r.focus_day || r.focusDay,
+            },
+            geometry: {
+              type: 'LineString',
+              coordinates: coords,
+            },
+          }
+        })
+
+      const routeFeatures = buildRouteFeatures(routes)
 
       map.addSource('routes', {
         type: 'geojson',
@@ -286,11 +293,17 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [], 
       }
 
       // ── Precompute convoy animation data ──
-      routeAnimDataRef.current = (routes || []).map((r) => {
-        const path = r.path || []
-        const { distances, total } = getPathDistances(path)
-        return { path, distances, total }
-      })
+      const buildAnimData = (routeList) =>
+        (routeList || []).map((r) => {
+          const dir = directionsByRoute[r.id]
+          const path = dir?.geometry
+            ? dir.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }))
+            : r.path || []
+          const { distances, total } = getPathDistances(path)
+          return { path, distances, total }
+        })
+
+      routeAnimDataRef.current = buildAnimData(routes)
 
       // ── Create convoy markers ──
       ;(routes || []).forEach((r) => {
@@ -367,6 +380,43 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [], 
       map.easeTo({ center: [avgLng, avgLat], duration: 300, easing: (t) => t })
     }
   }, [cursorSlot, playbackActive, routes])
+
+  // Update route geometry when Directions API results arrive
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !map.getSource('routes')) return
+    const hasDirections = Object.keys(directionsByRoute).length > 0
+    if (!hasDirections) return
+
+    const routeFeatures = (routes || []).map((r) => {
+      const dir = directionsByRoute[r.id]
+      const coords = dir?.geometry?.coordinates || (r.path || []).map((p) => [p.lng, p.lat])
+      return {
+        type: 'Feature',
+        properties: {
+          tone: r.tone || 'info',
+          familyId: r.family_id || r.familyId,
+          focusDay: r.focus_day || r.focusDay,
+        },
+        geometry: {
+          type: 'LineString',
+          coordinates: coords,
+        },
+      }
+    })
+
+    map.getSource('routes').setData({ type: 'FeatureCollection', features: routeFeatures })
+
+    // Recompute convoy animation data with real geometry
+    routeAnimDataRef.current = (routes || []).map((r) => {
+      const dir = directionsByRoute[r.id]
+      const path = dir?.geometry
+        ? dir.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }))
+        : r.path || []
+      const { distances, total } = getPathDistances(path)
+      return { path, distances, total }
+    })
+  }, [directionsByRoute, routes])
 
   // Toggle camera follow when playback starts/stops
   useEffect(() => {

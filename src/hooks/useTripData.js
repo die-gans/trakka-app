@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { fetchDirections } from '../lib/directions'
 import { supabase } from '../lib/supabase'
 import {
   getTrip,
@@ -272,6 +273,72 @@ export function useRoutes(tripId) {
   }, [load])
 
   return { routes, loading, refresh: load }
+}
+
+export function useDirections(route) {
+  const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const fetchedRef = useRef(false)
+
+  useEffect(() => {
+    if (!route?.waypoints || route.waypoints.length < 2) return
+    if (fetchedRef.current) return
+
+    let cancelled = false
+    setLoading(true)
+    fetchDirections(route.waypoints).then((data) => {
+      if (cancelled) return
+      if (data) {
+        setResult(data)
+        fetchedRef.current = true
+      }
+      setLoading(false)
+    }).catch((err) => {
+      if (cancelled) return
+      setError(err)
+      setLoading(false)
+    })
+
+    return () => { cancelled = true }
+  }, [route?.id, route?.waypoints])
+
+  return { ...result, loading, error }
+}
+
+export function useAllDirections(routes) {
+  const [results, setResults] = useState({})
+  const fetchedRef = useRef(new Set())
+
+  useEffect(() => {
+    if (!routes?.length) return
+
+    const toFetch = routes.filter((r) => r?.waypoints && r.waypoints.length >= 2 && !fetchedRef.current.has(r.id))
+    if (toFetch.length === 0) return
+
+    let cancelled = false
+
+    Promise.all(
+      toFetch.map(async (route) => {
+        const data = await fetchDirections(route.waypoints)
+        return { id: route.id, data }
+      })
+    ).then((fetched) => {
+      if (cancelled) return
+      const next = { ...results }
+      fetched.forEach(({ id, data }) => {
+        if (data) {
+          next[id] = data
+          fetchedRef.current.add(id)
+        }
+      })
+      setResults(next)
+    })
+
+    return () => { cancelled = true }
+  }, [routes])
+
+  return results
 }
 
 export function useItineraryItems(tripId) {

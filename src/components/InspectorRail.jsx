@@ -6,12 +6,14 @@ import {
   MapPin,
   Plus,
   Receipt,
+  Route,
   Square,
   Users,
   X,
 } from 'lucide-react'
 import { StatusPill } from './ui/StatusPill'
 import { cn } from '../lib/utils'
+import { formatDuration, formatDistance } from '../lib/directions'
 
 function SectionTitle({ eyebrow, title, meta }) {
   return (
@@ -181,6 +183,7 @@ export default function InspectorRail({
   expenses,
   locations,
   routes,
+  directionsByRoute,
   members,
   membersLoading,
   isEditor,
@@ -239,6 +242,17 @@ export default function InspectorRail({
     if (entity?.type !== 'task' || !entity.assigned_family_id) return null
     return families.find((f) => f.id === entity.assigned_family_id)
   }, [entity, families])
+
+  // Resolve family route + directions
+  const familyRoute = useMemo(() => {
+    if (entity?.type !== 'family') return null
+    return routes?.find((r) => r.familyId === entity.id || r.family_id === entity.id)
+  }, [entity, routes])
+
+  const familyDirections = useMemo(() => {
+    if (!familyRoute) return null
+    return directionsByRoute?.[familyRoute.id]
+  }, [familyRoute, directionsByRoute])
 
   // Resolve linked entities for itinerary items
   const resolvedLinkedEntities = useMemo(() => {
@@ -509,6 +523,57 @@ export default function InspectorRail({
                 </a>
               )}
             </div>
+          </section>
+        )}
+
+        {/* Drive plan for family */}
+        {entity.type === 'family' && familyRoute && (
+          <section className="border border-border-default bg-bg-surface p-4">
+            <SectionTitle
+              eyebrow="Route Intel"
+              title="Drive Plan"
+              meta={familyDirections ? `${formatDistance(familyDirections.distanceMeters)} · ${formatDuration(familyDirections.durationSeconds)}` : undefined}
+            />
+            <div className="space-y-0">
+              {(familyRoute.waypoints || []).map((wp, idx) => {
+                const isLast = idx === (familyRoute.waypoints || []).length - 1
+                const leg = familyDirections?.legs?.[idx]
+                const prevLegsDuration = (familyDirections?.legs || []).slice(0, idx).reduce((s, l) => s + (l?.duration || 0), 0)
+                const cumulativeMin = Math.round(prevLegsDuration / 60)
+                const hour = Math.floor(cumulativeMin / 60)
+                const min = cumulativeMin % 60
+                const eta = idx === 0 ? 'Departure' : `+${hour > 0 ? `${hour}h ` : ''}${min}m`
+
+                return (
+                  <div key={idx} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div className={cn(
+                        'h-2.5 w-2.5 rounded-full border-2',
+                        idx === 0 ? 'border-success bg-success-soft' : isLast ? 'border-info bg-info-soft' : 'border-warning bg-warning-soft'
+                      )} />
+                      {!isLast && <div className="mt-1 w-px flex-1 bg-border-default/50" />}
+                    </div>
+                    <div className={cn('pb-3', isLast && 'pb-0')}>
+                      <div className="text-[11px] font-bold text-text-primary">{wp.name}</div>
+                      <div className="text-[10px] text-text-secondary">
+                        {eta}
+                        {leg && (
+                          <span className="ml-2">
+                            {formatDistance(leg.distance)} · {formatDuration(leg.duration)}
+                          </span>
+                        )}
+                      </div>
+                      {leg?.summary && (
+                        <div className="mt-0.5 text-[9px] text-text-muted">{leg.summary}</div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {!familyDirections && (
+              <div className="mt-2 text-[10px] text-text-muted">Calculating route...</div>
+            )}
           </section>
         )}
 

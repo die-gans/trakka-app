@@ -210,9 +210,14 @@ export const INITIAL_ROUTES = [
     familyId: 'sydney-crew',
     focusDay: 'thu',
     tone: 'info',
+    waypoints: [
+      { name: 'Sydney', lat: -33.8688, lng: 151.2093 },
+      { name: 'Kiama', lat: -34.6721, lng: 150.8547 },
+      { name: 'Jervis Bay', lat: -35.1333, lng: 150.7000 },
+    ],
     path: [
       { lat: -33.8688, lng: 151.2093 },
-      { lat: -34.2000, lng: 150.8000 },
+      { lat: -34.6721, lng: 150.8547 },
       { lat: -35.1333, lng: 150.7000 },
     ],
   },
@@ -221,9 +226,14 @@ export const INITIAL_ROUTES = [
     familyId: 'melbourne-crew',
     focusDay: 'thu',
     tone: 'warning',
+    waypoints: [
+      { name: 'Melbourne', lat: -37.8136, lng: 144.9631 },
+      { name: 'Albury', lat: -36.0808, lng: 146.9165 },
+      { name: 'Jervis Bay', lat: -35.1333, lng: 150.7000 },
+    ],
     path: [
       { lat: -37.8136, lng: 144.9631 },
-      { lat: -36.5000, lng: 147.3000 },
+      { lat: -36.0808, lng: 146.9165 },
       { lat: -35.1333, lng: 150.7000 },
     ],
   },
@@ -232,9 +242,14 @@ export const INITIAL_ROUTES = [
     familyId: 'canberra-crew',
     focusDay: 'thu',
     tone: 'success',
+    waypoints: [
+      { name: 'Canberra', lat: -35.2809, lng: 149.1300 },
+      { name: 'Braidwood', lat: -35.4458, lng: 149.7997 },
+      { name: 'Jervis Bay', lat: -35.1333, lng: 150.7000 },
+    ],
     path: [
       { lat: -35.2809, lng: 149.1300 },
-      { lat: -35.2000, lng: 149.9000 },
+      { lat: -35.4458, lng: 149.7997 },
       { lat: -35.1333, lng: 150.7000 },
     ],
   },

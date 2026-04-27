@@ -60,6 +60,7 @@
  * @property {string} focusDay
  * @property {string} tone
  * @property {{lat: number, lng: number}[]} path
+ * @property {Array<{name: string, lat: number, lng: number}>} [waypoints]
  * @property {number} [durationSeconds]
  * @property {number} [distanceMeters]
  */

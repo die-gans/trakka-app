@@ -107,10 +107,12 @@
   - Edit modal has multi-select picker for locations, meals, routes, tasks, expenses
   - Seed data populated with realistic links (Depart Sydney → route, Hyams Beach → location + meal, etc.)
 
-- [ ] **Drive plan per family**
-  - Stop-by-stop breakdown with ETAs
-  - Pairs with map — families tab shows departure + stops
-  - Route lines now live on map view
+- [x] **Drive plan per family** ✅
+  - Mapbox Directions API v5 for real road geometry
+  - Waypoints with stop-by-stop breakdown (distance, duration, ETA) in FamiliesView
+  - Drive Plan section in InspectorRail when family selected
+  - Real geometry used for map route lines + convoy animation (falls back to straight-line waypoints)
+  - Seed data: Sydney→Kiama→Jervis Bay, Melbourne→Albury→Jervis Bay, Canberra→Braidwood→Jervis Bay
 
 - [x] **Daily briefing / situation board** ✅
   - Full-screen modal per day with mission code, tone, summary, lookouts
@@ -230,9 +232,10 @@ vercel --prod
 6. Pages are in `src/pages/` — Dashboard.jsx is the main view, Login.jsx is auth
 7. Run `npm run dev` to see the current state
 
-**Next recommended ticket:** Drive plan per family — stop-by-stop breakdown with ETAs, pairs with map view.
+**Next recommended ticket:** Your call — core v0.1 is complete. Options: expense split manual mode, real-time family GPS check-ins, trip creation wizard, or PWA offline support.
 
 **Recently shipped:**
+- Drive plan per family — Mapbox Directions API, real road geometry, stop-by-stop ETAs in FamiliesView + InspectorRail
 - Linked Entities — itinerary items link to meals/locations/routes/tasks/expenses, clickable in InspectorRail
 - Mapbox integration with dark styling, route lines, cursor-synced convoy, camera follow, map controls
 - Timeline playback with cursor, scrubber, Mission Launch checkpoints
