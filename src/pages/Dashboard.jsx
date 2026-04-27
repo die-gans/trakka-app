@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { NavRail } from '../components/ui/NavRail'
 import { TopBar } from '../components/ui/TopBar'
@@ -6,6 +6,8 @@ import { SectionTitle } from '../components/ui/SectionTitle'
 import { StatusPill } from '../components/ui/StatusPill'
 import { WeatherWidget } from '../components/WeatherWidget'
 import { MapView } from '../components/MapView'
+import { MissionLaunchModal } from '../components/MissionLaunchModal'
+import { DailyBriefingModal } from '../components/DailyBriefingModal'
 import InspectorRail from '../components/InspectorRail'
 import {
   useTrip,
@@ -20,6 +22,16 @@ import {
   useItineraryItems,
 } from '../hooks/useTripData'
 import { DAYS, TIME_SLOTS } from '../data/seedTrip'
+import {
+  clampTimelineCursor,
+  buildOperationCheckpoints,
+  findCrossedCheckpoint,
+  getSuggestedPlaybackStart,
+  getCursorDay,
+  PLAYBACK_SLOT_UNITS_PER_SECOND,
+  PLAYBACK_MAX_FRAME_DELTA_SECONDS,
+  PLAYBACK_STALL_RESET_SECONDS,
+} from '../lib/timeline-helpers'
 import { signOut } from '../lib/supabase'
 import { cn } from '../lib/utils'
 import {
@@ -36,7 +48,7 @@ import {
   updateItineraryItem,
   deleteItineraryItem,
 } from '../lib/supabase-crud'
-import { Plus, Trash2, Pencil, X } from 'lucide-react'
+import { Plus, Trash2, Pencil, X, Play, Pause, RotateCcw, Gauge, FileText } from 'lucide-react'
 
 function EmptyState({ title, subtitle }) {
   return (
@@ -791,7 +803,11 @@ function ExpensesView({ tripId, expenses, loading, onSelectEntity, isEditor, onC
 }
 
 /* ─── Itinerary View with CRUD ─── */
-function ItineraryView({ tripId, items, loading, isEditor, families, onRefresh, tripMeta }) {
+function ItineraryView({
+  tripId, items, loading, isEditor, families, onRefresh, tripMeta,
+  cursorSlot, isPlaying, playbackSpeed,
+  onTogglePlayback, onRestartPlayback, onSetPlaybackSpeed, onSetCursor, onOpenBriefing,
+}) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({ title: '', day_id: 'thu', row_id: 'activities', start_slot: '0', span: '1', color: 'info' })
@@ -947,6 +963,12 @@ function ItineraryView({ tripId, items, loading, isEditor, families, onRefresh, 
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-[10px] text-text-secondary">{day.weather} · {day.temperature}</span>
+                <button
+                  onClick={() => onOpenBriefing?.(day.id)}
+                  className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-text-muted hover:text-info transition-colors"
+                >
+                  <FileText size={10} /> Briefing
+                </button>
                 {isEditor && (
                   <button
                     onClick={() => openAdd(day.id, 'activities', 0)}
@@ -959,7 +981,26 @@ function ItineraryView({ tripId, items, loading, isEditor, families, onRefresh, 
             </div>
 
             {/* Gantt grid */}
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto relative">
+              {/* Cursor line (day-level) */}
+              {(() => {
+                const dayIndex = DAYS.findIndex((d) => d.id === day.id)
+                const dayStart = dayIndex * TIME_SLOTS.length
+                const dayEnd = dayStart + TIME_SLOTS.length
+                if (cursorSlot >= dayStart - 0.01 && cursorSlot <= dayEnd + 0.01) {
+                  const dayCursor = cursorSlot - dayStart
+                  const hour = dayCursor * 6
+                  const leftPct = (hour / 24) * 100
+                  return (
+                    <div
+                      className="absolute top-0 bottom-0 z-20 pointer-events-none"
+                      style={{ left: `calc(80px + ${leftPct}%)`, width: '1px', background: 'rgba(88,166,255,0.6)', boxShadow: '0 0 6px rgba(88,166,255,0.4)' }}
+                    />
+                  )
+                }
+                return null
+              })()}
+
               {/* Time axis header */}
               <div className="flex border-b border-border-default/60 bg-bg-panel" style={{ paddingLeft: '80px' }}>
                 {[0, 6, 12, 18].map((slot) => (
@@ -1014,18 +1055,27 @@ function ItineraryView({ tripId, items, loading, isEditor, families, onRefresh, 
                         const leftPct = (item.start_slot / 24) * 100
                         const widthPct = ((item.span || 1) * 6 / 24) * 100
                         const clampedWidth = Math.min(widthPct, 100 - leftPct)
+                        const itemStartSlotGlobal = dayIndex * TIME_SLOTS.length + item.start_slot / 6
+                        const itemEndSlotGlobal = itemStartSlotGlobal + (item.span || 1)
+                        const isPast = cursorSlot > itemEndSlotGlobal
+                        const isCurrent = cursorSlot >= itemStartSlotGlobal && cursorSlot <= itemEndSlotGlobal
                         return (
                           <div
                             key={item.id}
                             className={cn(
-                              'absolute top-1.5 bottom-1.5 border px-2 flex items-center gap-1 text-[10px] font-bold overflow-hidden group cursor-default z-10',
-                              colorClasses[item.color] || colorClasses.info
+                              'absolute top-1.5 bottom-1.5 border px-2 flex items-center gap-1 text-[10px] font-bold overflow-hidden group cursor-default z-10 transition-opacity',
+                              colorClasses[item.color] || colorClasses.info,
+                              isPast && !isCurrent && 'opacity-40',
+                              isCurrent && 'ring-1 ring-info/50'
                             )}
                             style={{ left: `${leftPct}%`, width: `calc(${clampedWidth}% - 2px)` }}
                           >
                             <span className="truncate leading-none">{item.title}</span>
                             {(item.span || 1) > 1 && (
                               <span className="flex-shrink-0 text-[8px] opacity-60">{(item.span || 1) * 6}h</span>
+                            )}
+                            {isCurrent && isPlaying && (
+                              <span className="flex-shrink-0 ml-auto h-1.5 w-1.5 rounded-full bg-info animate-pulse" />
                             )}
                             {isEditor && (
                               <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
@@ -1053,6 +1103,76 @@ function ItineraryView({ tripId, items, loading, isEditor, families, onRefresh, 
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Playback Controls */}
+      <div className="mt-4 border border-border-default bg-bg-surface">
+        <div className="flex h-12 items-center border-b border-border-default/50">
+          <div className="flex w-28 flex-col justify-center gap-1 border-r border-border-default bg-bg-panel/50 px-2">
+            <div className="flex items-center justify-center gap-1">
+              <button
+                type="button"
+                onClick={onTogglePlayback}
+                className="inline-flex h-7 w-7 items-center justify-center border border-info/40 bg-info-soft text-info transition-colors hover:border-info"
+                title={isPlaying ? 'Pause playback' : 'Play playback'}
+              >
+                {isPlaying ? <Pause size={13} /> : <Play size={13} className="translate-x-[1px]" />}
+              </button>
+              <button
+                type="button"
+                onClick={onRestartPlayback}
+                className="inline-flex h-7 w-7 items-center justify-center border border-border-default bg-bg-panel text-text-secondary transition-colors hover:border-info/40 hover:text-text-primary"
+                title="Restart playback from trip start"
+              >
+                <RotateCcw size={13} />
+              </button>
+            </div>
+            <div className="flex items-center justify-center gap-1">
+              <Gauge size={10} className="text-text-secondary" />
+              <button
+                type="button"
+                onClick={() => onSetPlaybackSpeed?.((playbackSpeed % 4) + 1)}
+                className="text-[9px] font-black uppercase tracking-[0.16em] text-text-secondary transition-colors hover:text-text-primary"
+              >
+                {playbackSpeed}x
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-1 divide-x divide-border-default/30">
+            {DAYS.map((day) => (
+              <div key={day.id} className="flex flex-1 items-center gap-3 px-4">
+                <div>
+                  <div className="text-[9px] font-black uppercase tracking-tighter text-text-secondary">{day.weather}</div>
+                  <div className="text-[11px] font-bold text-text-primary">{day.temperature}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Scrubber */}
+        <div className="relative h-8 bg-bg-panel/50 cursor-col-resize"
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect()
+            const ratio = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 0.999999)
+            const totalSlots = DAYS.length * TIME_SLOTS.length
+            onSetCursor?.(ratio * totalSlots)
+          }}
+        >
+          {DAYS.map((_, i) => (
+            <div
+              key={i}
+              className="absolute top-0 bottom-0 border-l border-border-default/30"
+              style={{ left: `${(i / DAYS.length) * 100}%` }}
+            />
+          ))}
+          <div
+            className="absolute top-0 bottom-0 w-0.5 bg-info z-10 pointer-events-none"
+            style={{
+              left: `${(cursorSlot / (DAYS.length * TIME_SLOTS.length)) * 100}%`,
+              boxShadow: '0 0 6px rgba(88,166,255,0.5)',
+            }}
+          />
+        </div>
       </div>
 
       <InlineModal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Item' : 'Add Itinerary Item'}>
@@ -1133,6 +1253,134 @@ export function Dashboard() {
   const [activeFamily, setActiveFamily] = useState('sydney-crew')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedEntity, setSelectedEntity] = useState(null)
+
+  // ── Timeline playback state ──
+  const [cursorSlot, setCursorSlot] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [playbackSpeed, setPlaybackSpeed] = useState(1)
+  const [operationGate, setOperationGate] = useState(null)
+  const [briefingOpen, setBriefingOpen] = useState(false)
+  const [briefingDayId, setBriefingDayId] = useState(null)
+  const playbackCursorRef = useRef(0)
+  const playbackRunRef = useRef({ anchorCursor: 0, anchorTimestamp: null })
+  const triggeredCheckpointIdsRef = useRef(new Set())
+
+  const operationCheckpoints = useMemo(
+    () => buildOperationCheckpoints(itineraryItems),
+    [itineraryItems]
+  )
+
+  // rAF playback loop
+  useEffect(() => {
+    if (!isPlaying) return
+
+    let frameId = null
+    const maxCursor = clampTimelineCursor(DAYS.length * TIME_SLOTS.length)
+    playbackRunRef.current = { anchorCursor: playbackCursorRef.current, anchorTimestamp: null }
+
+    const animate = (timestamp) => {
+      if (operationGate) {
+        playbackRunRef.current.anchorTimestamp = timestamp
+        frameId = requestAnimationFrame(animate)
+        return
+      }
+
+      const previousTimestamp = playbackRunRef.current.anchorTimestamp
+      playbackRunRef.current.anchorTimestamp = timestamp
+
+      if (previousTimestamp == null) {
+        frameId = requestAnimationFrame(animate)
+        return
+      }
+
+      const rawDelta = Math.max((timestamp - previousTimestamp) / 1000, 0)
+      const deltaSeconds = rawDelta > PLAYBACK_STALL_RESET_SECONDS
+        ? 0
+        : Math.min(rawDelta, PLAYBACK_MAX_FRAME_DELTA_SECONDS)
+      const currentCursor = playbackCursorRef.current
+      const nextCursor = clampTimelineCursor(
+        currentCursor + deltaSeconds * PLAYBACK_SLOT_UNITS_PER_SECOND * playbackSpeed
+      )
+
+      const crossed = findCrossedCheckpoint(
+        operationCheckpoints, currentCursor, nextCursor, triggeredCheckpointIdsRef.current
+      )
+
+      if (crossed) {
+        triggeredCheckpointIdsRef.current.add(crossed.id)
+        playbackCursorRef.current = crossed.startSlot
+        setCursorSlot(crossed.startSlot)
+        setOperationGate(crossed)
+        playbackRunRef.current.anchorTimestamp = timestamp
+        frameId = requestAnimationFrame(animate)
+        return
+      }
+
+      playbackCursorRef.current = nextCursor
+      setCursorSlot(nextCursor)
+
+      if (nextCursor >= maxCursor - 0.002) {
+        setIsPlaying(false)
+        return
+      }
+
+      frameId = requestAnimationFrame(animate)
+    }
+
+    frameId = requestAnimationFrame(animate)
+    return () => { if (frameId) cancelAnimationFrame(frameId) }
+  }, [isPlaying, operationCheckpoints, playbackSpeed, operationGate])
+
+  const handleTogglePlayback = useCallback(() => {
+    if (isPlaying) {
+      const committed = clampTimelineCursor(playbackCursorRef.current)
+      setIsPlaying(false)
+      setCursorSlot(committed)
+      playbackCursorRef.current = committed
+      return
+    }
+    const start = getSuggestedPlaybackStart(cursorSlot, operationCheckpoints)
+    triggeredCheckpointIdsRef.current = new Set(
+      operationCheckpoints.filter((cp) => cp.startSlot <= start + 0.001).map((cp) => cp.id)
+    )
+    playbackRunRef.current = { anchorCursor: start, anchorTimestamp: null }
+    playbackCursorRef.current = start
+    setCursorSlot(start)
+    setIsPlaying(true)
+  }, [isPlaying, cursorSlot, operationCheckpoints])
+
+  const handleRestartPlayback = useCallback(() => {
+    setIsPlaying(false)
+    setOperationGate(null)
+    triggeredCheckpointIdsRef.current = new Set()
+    playbackCursorRef.current = 0
+    setCursorSlot(0)
+  }, [])
+
+  const handleSetCursor = useCallback((slot) => {
+    const next = clampTimelineCursor(slot)
+    setOperationGate(null)
+    triggeredCheckpointIdsRef.current = new Set(
+      operationCheckpoints.filter((cp) => cp.startSlot <= next + 0.001).map((cp) => cp.id)
+    )
+    playbackCursorRef.current = next
+    setCursorSlot(next)
+    if (isPlaying) {
+      playbackRunRef.current = { anchorCursor: next, anchorTimestamp: null }
+    }
+  }, [operationCheckpoints, isPlaying])
+
+  const handleProceedGate = useCallback(() => {
+    setOperationGate(null)
+  }, [])
+
+  const handleAbortGate = useCallback(() => {
+    const committed = clampTimelineCursor(playbackCursorRef.current)
+    setIsPlaying(false)
+    setOperationGate(null)
+    setCursorSlot(committed)
+    playbackCursorRef.current = committed
+  }, [])
 
   const handleSignOut = async () => {
     try {
@@ -1340,6 +1588,14 @@ export function Dashboard() {
             isEditor={isEditor}
             families={families}
             onRefresh={refreshItinerary}
+            cursorSlot={cursorSlot}
+            isPlaying={isPlaying}
+            playbackSpeed={playbackSpeed}
+            onTogglePlayback={handleTogglePlayback}
+            onRestartPlayback={handleRestartPlayback}
+            onSetPlaybackSpeed={setPlaybackSpeed}
+            onSetCursor={handleSetCursor}
+            onOpenBriefing={(dayId) => { setBriefingDayId(dayId); setBriefingOpen(true) }}
           />
         )
       case 'map':
@@ -1349,6 +1605,8 @@ export function Dashboard() {
             families={families}
             locations={locations}
             routes={routes}
+            cursorSlot={cursorSlot}
+            isPlaying={isPlaying}
           />
         )
       case 'tasks':
@@ -1443,6 +1701,27 @@ export function Dashboard() {
           />
         </div>
       </div>
+
+      {/* Modals */}
+      {briefingOpen && (
+        <DailyBriefingModal
+          dayId={briefingDayId}
+          items={itineraryItems}
+          meals={meals}
+          tasks={tasks}
+          onClose={() => setBriefingOpen(false)}
+          onSelectEntity={(type, data) => {
+            setSelectedEntity({ type, ...data })
+            setBriefingOpen(false)
+          }}
+        />
+      )}
+
+      <MissionLaunchModal
+        gate={operationGate}
+        onProceed={handleProceedGate}
+        onAbort={handleAbortGate}
+      />
     </div>
   )
 }

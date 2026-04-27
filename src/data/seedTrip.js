@@ -51,6 +51,53 @@ export const DAYS = [
 
 export const TIME_SLOTS = ['00', '06', '12', '18']
 
+export const DAY_BRIEFINGS = {
+  thu: {
+    code: 'Insertion / Consolidation',
+    tone: 'Amber',
+    summary:
+      'Thursday is about getting everyone in cleanly. The main threat is staggered arrival timing, road fatigue, and losing momentum before basecamp is fully online. Win condition: all families reach Jervis Bay, get through the gate, settle basecamp, and keep dinner simple enough that nobody burns out on night one.',
+    lookouts: [
+      'Protect arrival energy. Long-drive families should prioritise clean breaks over pushing nonstop.',
+      'Gate + check-in friction is the main avoidable failure point, so keep address, fee, and access details ready.',
+      'Do not over-schedule the evening. Dinner and reset are the operation.',
+    ],
+  },
+  fri: {
+    code: 'Basecamp / Local Ops',
+    tone: 'Blue',
+    summary:
+      'Friday is the stabilisation day. Everyone is in theatre, so the goal shifts from transit to rhythm: house setup, beach access, kid-friendly pacing, and preserving energy for the Booderee push. Keep the day flexible and bias toward a low-friction, high-enjoyment tempo.',
+    lookouts: [
+      'Parking, beach timing, and family split-ups can create unnecessary overhead if not lightly coordinated.',
+      'Use this day to test house logistics, meal flow, and what each family actually needs before Saturday.',
+      'Avoid turning the beach day into a checklist marathon. The point is to settle in.',
+    ],
+  },
+  sat: {
+    code: 'Booderee Main Mission',
+    tone: 'Red',
+    summary:
+      'Saturday is the primary excursion and the highest-complexity day of the trip. This is the longest operating window with the most movement, the most dependency on traffic and timing, and the highest risk of decision fatigue. Win condition: enter Booderee smoothly, pick a manageable plan, and preserve enough margin for a calm return and cookout evening.',
+    lookouts: [
+      'Departure discipline matters more than itinerary ambition. Late starts compound quickly on park day.',
+      'Pick a realistic park scope and protect turnaround timing before everyone gets tired.',
+      'This is the day to simplify decisions, not multiply them.',
+    ],
+  },
+  sun: {
+    code: 'Exfil / Reset',
+    tone: 'Green',
+    summary:
+      'Sunday is a controlled exit. The mission is not sightseeing, it is a clean departure: brunch, pack-out, house reset, and staggered family departures without chaos. The smoother the morning feels, the better the whole weekend lands in memory.',
+    lookouts: [
+      'Keep brunch simple and start pack-out early enough that checkout does not become the whole mood.',
+      'Assign quiet ownership for trash, fridge sweep, and final vehicle loading.',
+      'Avoid one-last-thing sprawl. The goal is a graceful exit, not extra complexity.',
+    ],
+  },
+}
+
 export const INITIAL_FAMILIES = [
   {
     id: 'sydney-crew',

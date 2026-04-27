@@ -115,7 +115,7 @@ function getCoords(item) {
   return null
 }
 
-export function MapView({ tripMeta, families = [], locations = [], routes = [] }) {
+export function MapView({ tripMeta, families = [], locations = [], routes = [], cursorSlot, isPlaying: playbackActive }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
@@ -157,6 +157,7 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [] }
         properties: {
           tone: r.tone || 'info',
           familyId: r.family_id || r.familyId,
+          focusDay: r.focus_day || r.focusDay,
         },
         geometry: {
           type: 'LineString',
@@ -306,7 +307,7 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [] }
 
   // Convoy playback animation
   useEffect(() => {
-    if (!isPlaying) {
+    if (!playbackActive) {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
       return
     }
@@ -358,7 +359,31 @@ export function MapView({ tripMeta, families = [], locations = [], routes = [] }
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
     }
-  }, [isPlaying])
+  }, [playbackActive])
+
+  // Cursor-driven route highlighting
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || cursorSlot == null) return
+    const dayIds = ['thu', 'fri', 'sat', 'sun']
+    const dayIndex = Math.min(Math.floor(cursorSlot / 4), dayIds.length - 1)
+    const activeDay = dayIds[dayIndex]
+
+    if (map.getLayer('routes')) {
+      map.setPaintProperty('routes', 'line-opacity', [
+        'match',
+        ['get', 'focusDay'],
+        activeDay, 1,
+        0.25,
+      ])
+      map.setPaintProperty('routes', 'line-width', [
+        'match',
+        ['get', 'focusDay'],
+        activeDay, 3,
+        1,
+      ])
+    }
+  }, [cursorSlot])
 
   if (!TOKEN) {
     return (
