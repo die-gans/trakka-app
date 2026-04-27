@@ -13,7 +13,7 @@
 |-------|------------|
 | Frontend | React 19 + Vite + Tailwind CSS v4 |
 | UI Components | Custom (NavRail, TopBar, StatusPill, SectionTitle) |
-| Maps | Mapbox GL JS ✅ integrated with dark styling + route lines + convoy playback |
+| Maps | Mapbox GL JS ✅ dark styling, route lines, cursor-synced convoy, camera follow, zoom/compass controls |
 | Animation | Framer Motion (installed, minimal use) |
 | Icons | Lucide React |
 | Auth | Supabase Auth (Google OAuth) |
@@ -96,7 +96,9 @@
   - Dark map styling matching TRAKKA palette ✅
   - Render route lines for each family unit ✅
   - Location markers for waypoints/basecamp ✅
-  - Route simulation / convoy playback ✅
+  - Cursor-synced convoy playback ✅
+  - Camera follow mode during playback ✅
+  - Map controls (zoom, compass, fullscreen) ✅
 
 - [ ] **Drive plan per family**
   - Stop-by-stop breakdown with ETAs
@@ -224,7 +226,7 @@ vercel --prod
 **Next recommended ticket:** Linked Entities — connect itinerary items to meals/locations/routes so clicking an itinerary block shows its linked entities in the InspectorRail. This completes the "command centre" data graph.
 
 **Recently shipped:**
-- Mapbox integration with dark styling, route lines, convoy playback
+- Mapbox integration with dark styling, route lines, cursor-synced convoy, camera follow, map controls
 - Timeline playback with cursor, scrubber, Mission Launch checkpoints
 - Daily Briefing modal per day
 - Nav consolidation (6 clean sections)
