@@ -2,7 +2,7 @@
 
 > **Live URL:** https://trakka-app.vercel.app  
 > **Repo:** https://github.com/die-gans/trakka-app  
-> **Last Updated:** 2026-04-26  
+> **Last Updated:** 2026-04-27  
 > **Current Status:** v0.1 Active — Backend live, auth working, core features shipping
 
 ---
@@ -13,7 +13,7 @@
 |-------|------------|
 | Frontend | React 19 + Vite + Tailwind CSS v4 |
 | UI Components | Custom (NavRail, TopBar, StatusPill, SectionTitle) |
-| Maps | Mapbox GL JS (installed, not yet integrated) |
+| Maps | Mapbox GL JS ✅ integrated with dark styling + route lines + convoy playback |
 | Animation | Framer Motion (installed, minimal use) |
 | Icons | Lucide React |
 | Auth | Supabase Auth (Google OAuth) |
@@ -63,8 +63,16 @@
 - [x] **Families/Units:** Readiness scores, checklists, responsibilities, status
 - [x] **Meals:** Meal plan with owner + status toggle + CRUD
 - [x] **Tasks:** Task board with open/done/blocked states + CRUD
-- [x] **Itinerary:** 4-day timeline grid with add/delete items + CRUD
+- [x] **Itinerary:** 4-day timeline grid with add/delete items + CRUD + playback scrubber + cursor line
 - [x] **Expenses:** List with CRUD, family name display, settle/unsettle toggle, settle-up net balance panel
+
+### Playback & Briefing
+- [x] **Timeline playback** — play/pause/restart/speed controls with rAF animation loop
+- [x] **Cursor-driven timeline** — scrubber bar, vertical cursor line, item dimming (past/current/future)
+- [x] **Mission Launch modal** — dramatic per-day countdown overlay with themed colors (amber/blue/red/green)
+- [x] **Operation checkpoints** — playback pauses at first activity of each day, triggers Mission Launch
+- [x] **Daily Briefing modal** — full-screen situational awareness per day: summary, lookouts, stats, meals, tasks
+- [x] **Map cursor sync** — routes highlight/dim based on active cursor day
 
 ### Weather
 - [x] WeatherWidget complete (current conditions, 5-day forecast, fire danger rating)
@@ -95,9 +103,11 @@
   - Pairs with map — families tab shows departure + stops
   - Route lines now live on map view
 
-- [ ] **Daily briefing / situation board**
-  - Live items, upcoming tasks, risk alerts consolidated view
-  - High visual impact, positions TRAKKA as a command centre not just a planner
+- [x] **Daily briefing / situation board** ✅
+  - Full-screen modal per day with mission code, tone, summary, lookouts
+  - Stats: live items, meals, open tasks
+  - Clickable itinerary, meals, and tasks within briefing
+  - Positions TRAKKA as a command centre
 
 ### Medium Priority
 - [ ] **Expense split — manual + individual modes**
@@ -124,9 +134,9 @@
 
 - [ ] **Export** — JSON/PDF itinerary
 
-- [ ] **Activities view** — currently a placeholder; schema supports it
+- [x] ~~Activities view~~ — folded into Itinerary nav ✅
 
-- [ ] **Stay view** — currently a placeholder; schema supports it
+- [x] ~~Stay view~~ — folded into Itinerary nav ✅
 
 ---
 
@@ -134,7 +144,7 @@
 
 | Version | Focus | Features |
 |---------|-------|----------|
-| **v0.2** | Real-time + Mobile | Live ops dashboard, family chat, push notifications, trip creation |
+| **v0.2** | Real-time + Mobile | Live ops dashboard, family chat, push notifications, checkpoint system |
 | **v0.3** | Camping Module | Gear inventory, campsite intel, track conditions, fire bans, Leave No Trace checklists |
 | **v0.4** | Advanced Coordination | AI trip suggestions, automated ETAs, traffic integration, emergency beacon support |
 | **v0.5** | Commercialization | Payment processing, subscription tiers, team/organizer accounts, white-label option |
@@ -179,6 +189,9 @@ vercel --prod
 | 2026-04-24 | Vercel for hosting | Git-integrated, automatic deploys, edge network, free tier generous |
 | 2026-04-26 | Anonymous auth for dev bypass | Real Supabase JWT without Google login; RLS works correctly; no fake session hacks |
 | 2026-04-26 | `getSession()` not `getUser()` in CRUD | `getUser()` validates JWT server-side on every call — too slow and fragile for client CRUD; RLS enforces auth at DB level |
+| 2026-04-27 | Nav consolidation: Activities + Stay → Itinerary | Reduces conceptual duplication. Itinerary is the single source of truth for scheduled events |
+| 2026-04-27 | Timeline playback + Mission Launch | Ported from source inspiration. rAF loop with operation checkpoints and dramatic modal overlays |
+| 2026-04-27 | Separate hooks over unified trip document | Keeps current architecture simple. All data passed down to Dashboard, context derived at render time |
 | 2026-04-26 | Settle-up as net balance per family | Simpler to read than pairwise "A owes B $X" matrix; works for equal split; extend to manual when needed |
 
 ---
@@ -187,6 +200,7 @@ vercel --prod
 
 1. **No error handling for auth failures** — need toast/alert system
 2. **Timeline grid is static** — no drag-to-resize; items are add/delete only
+8. **Linked entities** — itinerary items can link to meals/locations but UI for creating links is not built yet
 3. **Mobile viewport untested** — dashboard is desktop-optimized only
 4. **BOM API key exposed client-side** — `VITE_` prefix required for Vite, but key is low-risk public weather data
 5. **Expense split — manual/individual modes** — UI accepts the mode but doesn't show per-family allocation fields yet
@@ -207,7 +221,13 @@ vercel --prod
 6. Pages are in `src/pages/` — Dashboard.jsx is the main view, Login.jsx is auth
 7. Run `npm run dev` to see the current state
 
-**Next recommended ticket:** Mapbox integration — it's the signature feature that makes this feel like a command centre rather than a planner. Token is already installed (`VITE_MAPBOX_ACCESS_TOKEN`), just needs wiring.
+**Next recommended ticket:** Linked Entities — connect itinerary items to meals/locations/routes so clicking an itinerary block shows its linked entities in the InspectorRail. This completes the "command centre" data graph.
+
+**Recently shipped:**
+- Mapbox integration with dark styling, route lines, convoy playback
+- Timeline playback with cursor, scrubber, Mission Launch checkpoints
+- Daily Briefing modal per day
+- Nav consolidation (6 clean sections)
 
 **Style guide:**
 - 9px font for eyebrows/labels, uppercase, tracking-wider
