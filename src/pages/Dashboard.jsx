@@ -1379,9 +1379,17 @@ export function Dashboard() {
           />
         )
       case 'activities':
-        return <PlaceholderView title="Activities" subtitle="Main Ops" />
       case 'stay':
-        return <PlaceholderView title="Stay" subtitle="Basecamp Intel" />
+        return (
+          <ItineraryView
+            tripId={tripId}
+            items={itineraryItems}
+            loading={itineraryLoading}
+            isEditor={isEditor}
+            families={families}
+            onRefresh={refreshItinerary}
+          />
+        )
       default:
         return (
           <FamiliesView
