@@ -383,22 +383,26 @@ export function CreateTrip() {
 
       // Create routes for each family
       for (let i = 0; i < createdFamilies.length; i++) {
-        const family = createdFamilies[i]
-        const waypoints = buildWaypointsForFamily(i)
-        if (waypoints.length < 2) continue
+        try {
+          const family = createdFamilies[i]
+          const waypoints = buildWaypointsForFamily(i)
+          if (waypoints.length < 2) continue
 
-        const dir = await fetchDirections(waypoints)
+          const dir = await fetchDirections(waypoints)
 
-        await createRoute({
-          trip_id: trip.id,
-          family_id: family.id,
-          title: `${family.shortOrigin || family.origin} → Basecamp`,
-          focus_day: 'thu',
-          tone: i === 0 ? 'info' : i === 1 ? 'warning' : 'success',
-          path: waypoints,
-          duration_seconds: dir?.durationSeconds != null ? Math.round(dir.durationSeconds) : null,
-          distance_meters: dir?.distanceMeters != null ? Math.round(dir.distanceMeters) : null,
-        })
+          await createRoute({
+            trip_id: trip.id,
+            family_id: family.id,
+            title: `${family.shortOrigin || family.origin} → Basecamp`,
+            focus_day: 'thu',
+            tone: i === 0 ? 'info' : i === 1 ? 'warning' : 'success',
+            path: waypoints,
+            duration_seconds: dir?.durationSeconds != null ? Math.round(dir.durationSeconds) : null,
+            distance_meters: dir?.distanceMeters != null ? Math.round(dir.distanceMeters) : null,
+          })
+        } catch (routeErr) {
+          console.warn('Failed to create route for family:', routeErr)
+        }
       }
 
       navigate(`/trips/${trip.id}`)
