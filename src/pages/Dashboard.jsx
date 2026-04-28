@@ -1552,6 +1552,7 @@ export function Dashboard() {
             onRestartPlayback={handleRestartPlayback}
             onSetPlaybackSpeed={setPlaybackSpeed}
             onSetCursor={handleSetCursor}
+            itineraryItems={itineraryItems}
           />
         )
       case 'tasks':
