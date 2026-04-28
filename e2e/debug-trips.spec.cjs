@@ -1,16 +1,10 @@
 const { test, expect } = require('@playwright/test')
 const fs = require('fs')
-
-const SESSION = JSON.parse(fs.readFileSync('/tmp/trakka_session.json', 'utf8'))
-const AUTH_KEY = 'sb-127-auth-token'
+const { injectSession } = require('./test-helpers.cjs')
 
 test('debug trips page', async ({ page }) => {
-  await page.goto('http://localhost:5173/login')
-  await page.evaluate(({ key, session }) => {
-    localStorage.setItem(key, JSON.stringify(session))
-  }, { key: AUTH_KEY, session: SESSION })
-
-  await page.goto('http://localhost:5173/trips')
+  await injectSession(page)
+  await page.goto('/trips')
   await page.waitForTimeout(2000)
 
   const html = await page.content()

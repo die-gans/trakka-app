@@ -28,3 +28,5 @@ dist-ssr
 .env.vercel
 test-results/
 supabase/.temp/
+.e2e-session.json
+.e2e-trip-id.json

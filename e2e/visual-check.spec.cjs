@@ -1,15 +1,5 @@
 const { test, expect } = require('@playwright/test')
-const fs = require('fs')
-
-const SESSION = JSON.parse(fs.readFileSync('/tmp/trakka_session.json', 'utf8'))
-const AUTH_KEY = 'sb-127-auth-token'
-
-async function injectAuth(page) {
-  await page.goto('http://localhost:5173/login')
-  await page.evaluate(({ key, session }) => {
-    localStorage.setItem(key, JSON.stringify(session))
-  }, { key: AUTH_KEY, session: SESSION })
-}
+const { injectSession } = require('./test-helpers.cjs')
 
 async function capture(page, name) {
   const path = `/tmp/trakka-visual-${name}.png`
@@ -24,18 +14,31 @@ test('visual check — all dashboard views', async ({ page }) => {
   })
   page.on('pageerror', err => consoleErrors.push(err.message))
 
-  // Auth + navigate to mock trip
-  await injectAuth(page)
-  await page.goto('http://localhost:5173/trips/trip-jervis-bay-2026')
-  await page.waitForTimeout(2500)
+  // Auth + navigate to seeded Jervis Bay trip
+  await injectSession(page)
+  await page.goto('/trips')
+  await page.waitForTimeout(1500)
+
+  // Find and click the Jervis Bay trip card
+  const jervisCard = page.locator('button, a', { hasText: /Jervis Bay Long Weekend/i }).first()
+  if (await jervisCard.isVisible().catch(() => false)) {
+    await jervisCard.click()
+    await page.waitForTimeout(2500)
+  } else {
+    // Fallback: if we know the trip ID, navigate directly
+    const fs = require('fs')
+    const tripId = JSON.parse(fs.readFileSync('.e2e-trip-id.json', 'utf8')).tripId
+    await page.goto(`/trips/${tripId}`)
+    await page.waitForTimeout(2500)
+  }
   await capture(page, '01-dashboard-families')
 
-  // Navigate to Map
-  const mapNav = page.locator('button', { hasText: /Map/i }).first()
-  if (await mapNav.isVisible().catch(() => false)) {
-    await mapNav.click()
+  // Navigate to Situation (fused map + timeline)
+  const sitNav = page.locator('button', { hasText: /Situation/i }).first()
+  if (await sitNav.isVisible().catch(() => false)) {
+    await sitNav.click()
     await page.waitForTimeout(2500)
-    await capture(page, '02-dashboard-map')
+    await capture(page, '02-dashboard-situation')
   }
 
   // Navigate to Itinerary
