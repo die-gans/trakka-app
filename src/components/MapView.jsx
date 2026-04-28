@@ -151,7 +151,61 @@ export const MapView = memo(function MapView({ tripMeta, families = [], location
   const routeAnimDataRef = useRef([])
   const followingRef = useRef(false)
   const directionsRef = useRef(directionsByRoute)
+  const cursorSlotRef = useRef(cursorSlot)
   directionsRef.current = directionsByRoute
+  cursorSlotRef.current = cursorSlot
+
+  // Position convoy markers for a given cursor value
+  const positionConvoys = (map, slot, followCamera) => {
+    if (!map || slot == null) return
+    const dayIndex = Math.min(Math.floor(slot / SLOTS_PER_DAY), DAY_IDS.length - 1)
+    const activeDay = DAY_IDS[dayIndex]
+
+    // Update route highlight
+    if (map.getLayer('routes')) {
+      map.setPaintProperty('routes', 'line-opacity', [
+        'match',
+        ['get', 'focusDay'],
+        activeDay, 1,
+        0.2,
+      ])
+      map.setPaintProperty('routes', 'line-width', [
+        'match',
+        ['get', 'focusDay'],
+        activeDay, 3,
+        1,
+      ])
+    }
+
+    // Position convoy markers
+    const activePositions = []
+    ;(routes || []).forEach((r, i) => {
+      const marker = convoyMarkersRef.current[i]
+      const data = routeAnimDataRef.current[i]
+      if (!marker || !data || !data.path.length) return
+
+      const progress = getRouteProgress(slot, r.focus_day || r.focusDay)
+      if (progress == null) {
+        marker.getElement().style.display = 'none'
+        return
+      }
+
+      const pos = interpolateAlongPath(data.path, data.distances, data.total, progress)
+      marker.setLngLat([pos.lng, pos.lat])
+      marker.getElement().style.display = 'block'
+
+      if (progress > 0 && progress < 1) {
+        activePositions.push(pos)
+      }
+    })
+
+    // Follow camera during playback
+    if (followCamera && activePositions.length > 0 && followingRef.current) {
+      const avgLng = activePositions.reduce((s, p) => s + p.lng, 0) / activePositions.length
+      const avgLat = activePositions.reduce((s, p) => s + p.lat, 0) / activePositions.length
+      map.easeTo({ center: [avgLng, avgLat], duration: 300, easing: (t) => t })
+    }
+  }
 
   // Initialize map
   useEffect(() => {
@@ -330,6 +384,9 @@ export const MapView = memo(function MapView({ tripMeta, families = [], location
           .addTo(map)
         convoyMarkersRef.current.push(marker)
       })
+
+      // Position convoy markers for current cursor (map may have loaded after cursor effect ran)
+      positionConvoys(map, cursorSlotRef.current, false)
     })
 
     return () => {
@@ -346,54 +403,7 @@ export const MapView = memo(function MapView({ tripMeta, families = [], location
   useEffect(() => {
     const map = mapRef.current
     if (!map || cursorSlot == null) return
-
-    const dayIndex = Math.min(Math.floor(cursorSlot / SLOTS_PER_DAY), DAY_IDS.length - 1)
-    const activeDay = DAY_IDS[dayIndex]
-
-    // Update route highlight
-    if (map.getLayer('routes')) {
-      map.setPaintProperty('routes', 'line-opacity', [
-        'match',
-        ['get', 'focusDay'],
-        activeDay, 1,
-        0.2,
-      ])
-      map.setPaintProperty('routes', 'line-width', [
-        'match',
-        ['get', 'focusDay'],
-        activeDay, 3,
-        1,
-      ])
-    }
-
-    // Position convoy markers based on cursor
-    const activePositions = []
-    ;(routes || []).forEach((r, i) => {
-      const marker = convoyMarkersRef.current[i]
-      const data = routeAnimDataRef.current[i]
-      if (!marker || !data || !data.path.length) return
-
-      const progress = getRouteProgress(cursorSlot, r.focus_day || r.focusDay)
-      if (progress == null) {
-        marker.getElement().style.display = 'none'
-        return
-      }
-
-      const pos = interpolateAlongPath(data.path, data.distances, data.total, progress)
-      marker.setLngLat([pos.lng, pos.lat])
-      marker.getElement().style.display = 'block'
-
-      if (progress > 0 && progress < 1) {
-        activePositions.push(pos)
-      }
-    })
-
-    // Follow camera during playback
-    if (playbackActive && activePositions.length > 0 && followingRef.current) {
-      const avgLng = activePositions.reduce((s, p) => s + p.lng, 0) / activePositions.length
-      const avgLat = activePositions.reduce((s, p) => s + p.lat, 0) / activePositions.length
-      map.easeTo({ center: [avgLng, avgLat], duration: 300, easing: (t) => t })
-    }
+    positionConvoys(map, cursorSlot, playbackActive)
   }, [cursorSlot, playbackActive, routes, directionsByRoute])
 
   // Update route geometry when Directions API results arrive
