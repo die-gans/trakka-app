@@ -2,8 +2,8 @@
 
 > **Live URL:** https://trakka-app.vercel.app  
 > **Repo:** https://github.com/die-gans/trakka-app  
-> **Last Updated:** 2026-04-27  
-> **Current Status:** v0.1 Active — Backend live, auth working, core features shipping
+> **Last Updated:** 2026-04-28  
+> **Current Status:** v0.1 Complete — Temporal-Spatial Fusion shipped, all high-priority features live
 
 ---
 
@@ -64,6 +64,7 @@
 - [x] **Meals:** Meal plan with owner + status toggle + CRUD
 - [x] **Tasks:** Task board with open/done/blocked states + CRUD
 - [x] **Itinerary:** 4-day timeline grid with add/delete items + CRUD + playback scrubber + cursor line
+- [x] **Situation:** Fused map + timeline view (Temporal-Spatial Fusion) with floating playback controls
 - [x] **Expenses:** List with CRUD, family name display, settle/unsettle toggle, settle-up net balance panel
 
 ### Playback & Briefing
@@ -73,6 +74,7 @@
 - [x] **Operation checkpoints** — playback pauses at first activity of each day, triggers Mission Launch
 - [x] **Daily Briefing modal** — full-screen situational awareness per day: summary, lookouts, stats, meals, tasks
 - [x] **Map cursor sync** — routes highlight/dim based on active cursor day
+- [x] **Situation view (fused)** — Temporal-Spatial Fusion: map + timeline playback + scrubber visible simultaneously; floating controls overlay; replaces standalone Map tab
 
 ### Weather
 - [x] WeatherWidget complete (current conditions, 5-day forecast, fire danger rating)
@@ -151,6 +153,20 @@
 
 ---
 
+## ✅ v0.1 Complete — Shipped
+
+All high-priority v0.1 features are now live:
+- **Temporal-Spatial Fusion** — Situation view combines map, timeline scrubber, and playback controls
+- **6 dashboard views** — Itinerary, Situation, Meals, Tasks, Expenses, Families
+- **Playback engine** — rAF loop with checkpoints, Mission Launch modals, cursor sync across map + timeline
+- **Drive plans** — Real Mapbox Directions geometry per family
+- **Linked entities** — Itinerary items link to meals, locations, routes, tasks, expenses
+- **Full CRUD** — Meals, tasks, expenses, itinerary items
+- **Auth + RLS** — Google OAuth + anonymous dev bypass
+- **Weather** — BOM integration wired to trip basecamp
+
+---
+
 ## 🗺️ Roadmap — Beyond v0.1
 
 | Version | Focus | Features |
@@ -211,12 +227,12 @@ vercel --prod
 
 1. **No error handling for auth failures** — need toast/alert system
 2. **Timeline grid is static** — no drag-to-resize; items are add/delete only
-8. **Linked entities** — itinerary items can link to meals/locations but UI for creating links is not built yet
-3. **Mobile viewport untested** — dashboard is desktop-optimized only
-4. **BOM API key exposed client-side** — `VITE_` prefix required for Vite, but key is low-risk public weather data
-5. **Expense split — manual/individual modes** — UI accepts the mode but doesn't show per-family allocation fields yet
-6. **Trip basecamp coords not collected in CreateTrip form** — weather falls back to Jervis Bay defaults until lat/lng capture is added to the form
-7. **Weather unavailable locally** — `VITE_BOM_API_KEY` is production-only; add to Vercel dev env to fix
+3. **Linked entities** — itinerary items can link to meals/locations but UI for creating links is not built yet
+4. **Mobile viewport untested** — dashboard is desktop-optimized only
+5. **BOM API key exposed client-side** — `VITE_` prefix required for Vite, but key is low-risk public weather data
+6. **Expense split — manual/individual modes** — UI accepts the mode but doesn't show per-family allocation fields yet
+7. **Trip basecamp coords not collected in CreateTrip form** — weather falls back to Jervis Bay defaults until lat/lng capture is added to the form
+8. **Weather unavailable locally** — `VITE_BOM_API_KEY` is production-only; add to Vercel dev env to fix
 
 ---
 
@@ -235,6 +251,7 @@ vercel --prod
 **Next recommended ticket:** Your call — core v0.1 is complete. Options: expense split manual mode, real-time family GPS check-ins, trip creation wizard, or PWA offline support.
 
 **Recently shipped:**
+- **Situation view (Temporal-Spatial Fusion)** — Map + timeline playback fused into single immersive view with floating controls and shared PlaybackBar
 - Drive plan per family — Mapbox Directions API, real road geometry, stop-by-stop ETAs in FamiliesView + InspectorRail
 - Linked Entities — itinerary items link to meals/locations/routes/tasks/expenses, clickable in InspectorRail
 - Mapbox integration with dark styling, route lines, cursor-synced convoy, camera follow, map controls

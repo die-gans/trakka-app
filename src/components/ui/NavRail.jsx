@@ -14,7 +14,7 @@ import {
 
 const NAV_ITEMS = [
   { id: 'itinerary', label: 'Itinerary', icon: LayoutGrid },
-  { id: 'map', label: 'Map', icon: MapPin },
+  { id: 'situation', label: 'Situation', icon: MapPin },
   { id: 'meals', label: 'Meals', icon: Utensils },
   { id: 'tasks', label: 'Tasks', icon: ListChecks },
   { id: 'expenses', label: 'Expenses', icon: Receipt },

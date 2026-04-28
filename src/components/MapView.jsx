@@ -143,7 +143,7 @@ function getRouteProgress(cursorSlot, focusDay) {
   return (cursorSlot - dayStart) / SLOTS_PER_DAY
 }
 
-export const MapView = memo(function MapView({ tripMeta, families = [], locations = [], routes = [], directionsByRoute = {}, cursorSlot, isPlaying: playbackActive }) {
+export const MapView = memo(function MapView({ tripMeta, families = [], locations = [], routes = [], directionsByRoute = {}, cursorSlot, isPlaying: playbackActive, minimal = false }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
@@ -452,6 +452,18 @@ export const MapView = memo(function MapView({ tripMeta, families = [], location
   }
 
   const markerCount = (families?.length || 0) + 1 + (locations?.length || 0)
+
+  if (minimal) {
+    return (
+      <div className="h-full w-full">
+        <div
+          ref={containerRef}
+          className="h-full w-full"
+          style={{ background: '#0a0a0a' }}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full flex-col">

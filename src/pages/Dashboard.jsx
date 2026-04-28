@@ -11,6 +11,8 @@ import { TextInput } from '../components/ui/TextInput'
 import { SelectField } from '../components/ui/SelectField'
 import { WeatherWidget } from '../components/WeatherWidget'
 import { MapView } from '../components/MapView'
+import { PlaybackBar } from '../components/PlaybackBar'
+import { SituationView } from '../components/SituationView'
 import { MissionLaunchModal } from '../components/MissionLaunchModal'
 import { DailyBriefingModal } from '../components/DailyBriefingModal'
 import InspectorRail from '../components/InspectorRail'
@@ -55,7 +57,7 @@ import {
   updateItineraryItem,
   deleteItineraryItem,
 } from '../lib/supabase-crud'
-import { Plus, Trash2, Pencil, Play, Pause, RotateCcw, Gauge, FileText, ChevronDown, ChevronUp, Route } from 'lucide-react'
+import { Plus, Trash2, Pencil, FileText, ChevronDown, ChevronUp, Route } from 'lucide-react'
 
 
 
@@ -1153,75 +1155,15 @@ function ItineraryView({
         ))}
       </div>
 
-      {/* Playback Controls */}
-      <div className="mt-4 border border-border-default bg-bg-surface">
-        <div className="flex h-12 items-center border-b border-border-default/50">
-          <div className="flex w-28 flex-col justify-center gap-1 border-r border-border-default bg-bg-panel/50 px-2">
-            <div className="flex items-center justify-center gap-1">
-              <button
-                type="button"
-                onClick={onTogglePlayback}
-                className="inline-flex h-7 w-7 items-center justify-center border border-info/40 bg-info-soft text-info transition-colors hover:border-info"
-                title={isPlaying ? 'Pause playback' : 'Play playback'}
-              >
-                {isPlaying ? <Pause size={13} /> : <Play size={13} className="translate-x-[1px]" />}
-              </button>
-              <button
-                type="button"
-                onClick={onRestartPlayback}
-                className="inline-flex h-7 w-7 items-center justify-center border border-border-default bg-bg-panel text-text-secondary transition-colors hover:border-info/40 hover:text-text-primary"
-                title="Restart playback from trip start"
-              >
-                <RotateCcw size={13} />
-              </button>
-            </div>
-            <div className="flex items-center justify-center gap-1">
-              <Gauge size={10} className="text-text-secondary" />
-              <button
-                type="button"
-                onClick={() => onSetPlaybackSpeed?.((playbackSpeed % 4) + 1)}
-                className="text-[9px] font-black uppercase tracking-[0.16em] text-text-secondary transition-colors hover:text-text-primary"
-              >
-                {playbackSpeed}x
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-1 divide-x divide-border-default/30">
-            {DAYS.map((day) => (
-              <div key={day.id} className="flex flex-1 items-center gap-3 px-4">
-                <div>
-                  <div className="text-[9px] font-black uppercase tracking-tighter text-text-secondary">{day.weather}</div>
-                  <div className="text-[11px] font-bold text-text-primary">{day.temperature}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        {/* Scrubber */}
-        <div className="relative h-8 bg-bg-panel/50 cursor-col-resize"
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect()
-            const ratio = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 0.999999)
-            const totalSlots = DAYS.length * TIME_SLOTS.length
-            onSetCursor?.(ratio * totalSlots)
-          }}
-        >
-          {DAYS.map((_, i) => (
-            <div
-              key={i}
-              className="absolute top-0 bottom-0 border-l border-border-default/30"
-              style={{ left: `${(i / DAYS.length) * 100}%` }}
-            />
-          ))}
-          <div
-            className="absolute top-0 bottom-0 w-0.5 bg-info z-10 pointer-events-none"
-            style={{
-              left: `${(cursorSlot / (DAYS.length * TIME_SLOTS.length)) * 100}%`,
-              boxShadow: '0 0 6px rgba(88,166,255,0.5)',
-            }}
-          />
-        </div>
-      </div>
+      <PlaybackBar
+        cursorSlot={cursorSlot}
+        isPlaying={isPlaying}
+        playbackSpeed={playbackSpeed}
+        onTogglePlayback={onTogglePlayback}
+        onRestartPlayback={onRestartPlayback}
+        onSetPlaybackSpeed={onSetPlaybackSpeed}
+        onSetCursor={onSetCursor}
+      />
 
       <InlineModal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Item' : 'Add Itinerary Item'}>
         <div className="space-y-3">
@@ -1595,9 +1537,9 @@ export function Dashboard() {
 
           />
         )
-      case 'map':
+      case 'situation':
         return (
-          <MapView
+          <SituationView
             tripMeta={tripMeta}
             families={families}
             locations={locations}
@@ -1605,6 +1547,11 @@ export function Dashboard() {
             directionsByRoute={directionsByRoute}
             cursorSlot={cursorSlot}
             isPlaying={isPlaying}
+            playbackSpeed={playbackSpeed}
+            onTogglePlayback={handleTogglePlayback}
+            onRestartPlayback={handleRestartPlayback}
+            onSetPlaybackSpeed={setPlaybackSpeed}
+            onSetCursor={handleSetCursor}
           />
         )
       case 'tasks':
