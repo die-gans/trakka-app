@@ -354,24 +354,30 @@ export function CreateTrip() {
       // Create families
       const createdFamilies = []
       for (const family of families.filter((f) => f.name.trim())) {
+        const payload = {
+          trip_id: trip.id,
+          name: family.name,
+          short_origin: family.shortOrigin || null,
+          origin: family.origin || null,
+          origin_lat: family.originLat ?? null,
+          origin_lng: family.originLng ?? null,
+          headcount: family.headcount || null,
+          vehicle: family.vehicle || null,
+          responsibility: family.responsibility || null,
+          status: 'Transit',
+        }
+        
         const { data: famData, error: famError } = await supabase
           .from('families')
-          .insert({
-            trip_id: trip.id,
-            name: family.name,
-            short_origin: family.shortOrigin,
-            origin: family.origin,
-            origin_lat: family.originLat ?? null,
-            origin_lng: family.originLng ?? null,
-            headcount: family.headcount,
-            vehicle: family.vehicle,
-            responsibility: family.responsibility,
-            status: 'Transit',
-          })
+          .insert(payload)
           .select()
           .single()
 
-        if (famError) throw famError
+        if (famError) {
+          console.error('Family insert error:', famError, payload)
+          throw new Error(`Failed to insert family ${family.name}: ${famError.message || famError.details || JSON.stringify(famError)}`)
+        }
+
         createdFamilies.push({ ...family, id: famData.id })
       }
 
@@ -404,11 +410,12 @@ export function CreateTrip() {
     }
   }
 
-  const canSubmit = title && startDate && endDate
-
   const validFamilies = families.filter((f) => f.name.trim())
   const allFamiliesGeocoded = validFamilies.length > 0 && validFamilies.every((f) => f.originLat != null && f.originLng != null)
   const basecampGeocoded = basecampCoords != null
+  const allStopsGeocoded = routePlans.every(plan => (plan.stops || []).every(stop => stop.lat != null && stop.lng != null))
+  
+  const canSubmit = title && startDate && endDate && basecampGeocoded && allFamiliesGeocoded && allStopsGeocoded
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-bg-base font-sans text-text-primary antialiased">
@@ -505,6 +512,11 @@ export function CreateTrip() {
                         setBasecampCoords({ lat: place.lat, lng: place.lng })
                       }}
                     />
+                    {basecampAddress && !basecampCoords && (
+                      <div className="mt-1.5 text-[10px] text-critical">
+                        ⚠️ Please select a valid location from the dropdown or click on the map.
+                      </div>
+                    )}
                     {basecampCoords && (
                       <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-success">
                         <MapPin size={11} />
@@ -782,6 +794,11 @@ export function CreateTrip() {
                                   }
                                 }}
                               />
+                              {stop.address && stop.lat == null && (
+                                <div className="text-[10px] text-critical mt-1">
+                                  ⚠️ Please select a valid location from the dropdown or click on the map.
+                                </div>
+                              )}
                             </div>
                             <button
                               type="button"
@@ -843,10 +860,10 @@ export function CreateTrip() {
                   </button>
                   <button
                     onClick={() => setStep(4)}
-                    disabled={!basecampGeocoded || !allFamiliesGeocoded}
+                    disabled={!basecampGeocoded || !allFamiliesGeocoded || !allStopsGeocoded}
                     className={cn(
                       'border px-6 py-2 text-[11px] font-black uppercase tracking-wider',
-                      basecampGeocoded && allFamiliesGeocoded
+                      basecampGeocoded && allFamiliesGeocoded && allStopsGeocoded
                         ? 'border-info bg-info-soft text-info hover:bg-info/20'
                         : 'border-border-default bg-bg-panel text-text-muted cursor-not-allowed'
                     )}

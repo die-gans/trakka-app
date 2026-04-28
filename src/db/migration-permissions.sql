@@ -42,6 +42,20 @@ DROP POLICY IF EXISTS "Locations insertable by trip members" ON public.locations
 CREATE POLICY "Locations insertable by editors" ON public.locations
   FOR INSERT WITH CHECK (public.is_trip_editor(trip_id));
 
+-- Routes
+DROP POLICY IF EXISTS "Routes insertable by trip members" ON public.routes;
+DROP POLICY IF EXISTS "Routes updatable by trip members" ON public.routes;
+DROP POLICY IF EXISTS "Routes deletable by trip members" ON public.routes;
+
+CREATE POLICY "Routes readable by trip members" ON public.routes
+  FOR SELECT USING (public.is_trip_member(trip_id));
+CREATE POLICY "Routes insertable by editors" ON public.routes
+  FOR INSERT WITH CHECK (public.is_trip_editor(trip_id));
+CREATE POLICY "Routes updatable by editors" ON public.routes
+  FOR UPDATE USING (public.is_trip_editor(trip_id));
+CREATE POLICY "Routes deletable by editors" ON public.routes
+  FOR DELETE USING (public.is_trip_editor(trip_id));
+
 -- Meals
 DROP POLICY IF EXISTS "Meals insertable by trip members" ON public.meals;
 DROP POLICY IF EXISTS "Meals updatable by trip members" ON public.meals;

@@ -73,12 +73,17 @@ export async function createTrip(trip) {
   if (error) throw error
 
   // Add creator as organizer + editor
-  await supabase.from('trip_members').insert({
+  const { error: tmError } = await supabase.from('trip_members').insert({
     trip_id: data.id,
     user_id: user.id,
     role: 'organizer',
     permission: 'editor',
   })
+
+  if (tmError) {
+    console.error('Failed to create trip_member:', tmError)
+    throw tmError
+  }
 
   return data
 }
