@@ -1470,8 +1470,8 @@ export function Dashboard() {
     refreshExpenses()
   }
 
-  // Build trip meta from loaded data
-  const tripMeta = trip ? {
+  // Build trip meta from loaded data (memoized to prevent MapView re-init on every render)
+  const tripMeta = useMemo(() => trip ? {
     id: trip.id,
     title: trip.title,
     commandName: trip.command_name || trip.title,
@@ -1486,7 +1486,7 @@ export function Dashboard() {
     commandName: 'Loading...',
     basecampAddress: '',
     basecampCoordinates: { lat: -35.1333, lng: 150.7000 },
-  }
+  }, [trip])
 
   const renderPage = () => {
     switch (activePage) {

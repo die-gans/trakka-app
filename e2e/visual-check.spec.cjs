@@ -33,50 +33,25 @@ test('visual check — all dashboard views', async ({ page }) => {
   }
   await capture(page, '01-dashboard-families')
 
-  // Navigate to Situation (fused map + timeline)
-  const sitNav = page.locator('button', { hasText: /Situation/i }).first()
-  if (await sitNav.isVisible().catch(() => false)) {
-    await sitNav.click()
-    await page.waitForTimeout(2500)
-    await capture(page, '02-dashboard-situation')
+  // Navigate via nav rail (buttons have title attribute, no visible text)
+  const clickNav = async (title) => {
+    const btn = page.locator(`button[title="${title}"]`).first()
+    if (await btn.isVisible().catch(() => false)) {
+      await btn.click()
+      await page.waitForTimeout(2000)
+      return true
+    }
+    return false
   }
 
-  // Navigate to Itinerary
-  const itinNav = page.locator('button', { hasText: /Itinerary/i }).first()
-  if (await itinNav.isVisible().catch(() => false)) {
-    await itinNav.click()
-    await page.waitForTimeout(2500)
-    await capture(page, '03-dashboard-itinerary')
-  }
-
-  // Navigate to Meals
-  const mealsNav = page.locator('button', { hasText: /Meals/i }).first()
-  if (await mealsNav.isVisible().catch(() => false)) {
-    await mealsNav.click()
-    await page.waitForTimeout(1500)
-    await capture(page, '04-dashboard-meals')
-  }
-
-  // Navigate to Tasks
-  const tasksNav = page.locator('button', { hasText: /Tasks/i }).first()
-  if (await tasksNav.isVisible().catch(() => false)) {
-    await tasksNav.click()
-    await page.waitForTimeout(1500)
-    await capture(page, '05-dashboard-tasks')
-  }
-
-  // Navigate to Expenses
-  const expNav = page.locator('button', { hasText: /Expenses/i }).first()
-  if (await expNav.isVisible().catch(() => false)) {
-    await expNav.click()
-    await page.waitForTimeout(1500)
-    await capture(page, '06-dashboard-expenses')
-  }
+  if (await clickNav('Situation')) await capture(page, '02-dashboard-situation')
+  if (await clickNav('Itinerary')) await capture(page, '03-dashboard-itinerary')
+  if (await clickNav('Meals')) await capture(page, '04-dashboard-meals')
+  if (await clickNav('Tasks')) await capture(page, '05-dashboard-tasks')
+  if (await clickNav('Expenses')) await capture(page, '06-dashboard-expenses')
 
   // Back to Families, click a family to open InspectorRail
-  const famNav = page.locator('button', { hasText: /Families/i }).first()
-  if (await famNav.isVisible().catch(() => false)) {
-    await famNav.click()
+  if (await clickNav('Families')) {
     await page.waitForTimeout(1500)
     const familyCard = page.locator('button', { hasText: /The Morrisons/i }).first()
     if (await familyCard.isVisible().catch(() => false)) {
