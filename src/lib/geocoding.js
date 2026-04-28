@@ -76,3 +76,37 @@ export async function searchPlaces(query, limit = 5) {
     return []
   }
 }
+
+/**
+ * Reverse geocode coordinates to an address.
+ * @param {number} lng 
+ * @param {number} lat 
+ * @returns {Promise<{lat: number, lng: number, placeName: string} | null>}
+ */
+export async function reverseGeocode(lng, lat) {
+  if (!TOKEN) return null
+
+  const url = new URL(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json`)
+  url.searchParams.set('access_token', TOKEN)
+  url.searchParams.set('types', 'place,address,locality,neighborhood,poi')
+
+  try {
+    const res = await fetch(url.toString())
+    if (!res.ok) {
+      console.warn('TRAKKA: Reverse geocoding error', res.status)
+      return null
+    }
+    const data = await res.json()
+    const feature = data.features?.[0]
+    if (!feature) return null
+
+    return {
+      lat,
+      lng,
+      placeName: feature.place_name,
+    }
+  } catch (err) {
+    console.warn('TRAKKA: Reverse geocoding failed', err)
+    return null
+  }
+}

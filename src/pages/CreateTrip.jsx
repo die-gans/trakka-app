@@ -1,11 +1,110 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, MapPin, Route } from 'lucide-react'
+import mapboxgl from 'mapbox-gl'
+import 'mapbox-gl/dist/mapbox-gl.css'
 import { createTrip, createRoute } from '../lib/supabase-crud'
 import { supabase } from '../lib/supabase'
-import { searchPlaces } from '../lib/geocoding'
+import { searchPlaces, reverseGeocode } from '../lib/geocoding'
 import { fetchDirections } from '../lib/directions'
 import { cn } from '../lib/utils'
+
+const TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN
+
+function MiniMap({ waypoints = [], onMapClick, interactive = false }) {
+  const containerRef = useRef(null)
+  const mapRef = useRef(null)
+  const markersRef = useRef([])
+
+  useEffect(() => {
+    if (!TOKEN || !containerRef.current || mapRef.current) return
+
+    try {
+      mapboxgl.accessToken = TOKEN
+      mapRef.current = new mapboxgl.Map({
+        container: containerRef.current,
+        style: 'mapbox://styles/mapbox/dark-v11',
+        center: waypoints.length > 0 && waypoints[0].lng != null ? [waypoints[0].lng, waypoints[0].lat] : [133.7751, -25.2744],
+        zoom: waypoints.length > 0 && waypoints[0].lng != null ? 12 : 3,
+        attributionControl: false,
+        interactive: interactive || !!onMapClick,
+      })
+
+      if (onMapClick) {
+        mapRef.current.on('click', (e) => {
+          onMapClick(e.lngLat.lng, e.lngLat.lat)
+        })
+        mapRef.current.getCanvas().style.cursor = 'pointer'
+      }
+
+      mapRef.current.on('load', () => {
+        mapRef.current?.resize()
+        setTimeout(() => mapRef.current?.resize(), 100)
+      })
+
+      const observer = new ResizeObserver(() => {
+        mapRef.current?.resize()
+      })
+      observer.observe(containerRef.current)
+
+      return () => {
+        observer.disconnect()
+        mapRef.current?.remove()
+        mapRef.current = null
+      }
+    } catch (err) {
+      console.error('Failed to initialize map', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    markersRef.current.forEach(m => m.remove())
+    markersRef.current = []
+
+    if (waypoints.length === 0) return
+
+    const bounds = new mapboxgl.LngLatBounds()
+
+    waypoints.forEach((wp) => {
+      if (wp.lng == null || wp.lat == null) return
+      
+      const el = document.createElement('div')
+      el.style.width = wp.isBasecamp ? '16px' : '12px'
+      el.style.height = wp.isBasecamp ? '16px' : '12px'
+      el.style.borderRadius = '50%'
+      el.style.backgroundColor = wp.color || '#58A6FF'
+      el.style.border = '2px solid rgba(10,12,16,0.8)'
+      el.style.boxShadow = '0 1px 4px rgba(0,0,0,0.5)'
+
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat([wp.lng, wp.lat])
+        .addTo(map)
+
+      markersRef.current.push(marker)
+      bounds.extend([wp.lng, wp.lat])
+    })
+
+    if (waypoints.length > 1) {
+      map.fitBounds(bounds, { padding: 40, maxZoom: 12 })
+    } else if (waypoints.length === 1 && waypoints[0].lng != null && waypoints[0].lat != null) {
+      map.flyTo({ center: [waypoints[0].lng, waypoints[0].lat], zoom: 12 })
+    }
+  }, [waypoints])
+
+  return (
+    <div className="h-48 w-full border border-border-default bg-bg-panel relative overflow-hidden">
+      <div ref={containerRef} className="absolute inset-0" />
+      {!TOKEN && (
+        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-text-secondary bg-bg-base/80">
+          Mapbox token missing
+        </div>
+      )}
+    </div>
+  )
+}
 
 const DEFAULT_FAMILY = {
   name: '',
@@ -291,8 +390,8 @@ export function CreateTrip() {
           focus_day: 'thu',
           tone: i === 0 ? 'info' : i === 1 ? 'warning' : 'success',
           path: waypoints,
-          duration_seconds: dir?.durationSeconds ?? null,
-          distance_meters: dir?.distanceMeters ?? null,
+          duration_seconds: dir?.durationSeconds != null ? Math.round(dir.durationSeconds) : null,
+          distance_meters: dir?.distanceMeters != null ? Math.round(dir.distanceMeters) : null,
         })
       }
 
@@ -308,7 +407,7 @@ export function CreateTrip() {
   const canSubmit = title && startDate && endDate
 
   const validFamilies = families.filter((f) => f.name.trim())
-  const allFamiliesGeocoded = validFamilies.every((f) => f.originLat != null && f.originLng != null)
+  const allFamiliesGeocoded = validFamilies.length > 0 && validFamilies.every((f) => f.originLat != null && f.originLng != null)
   const basecampGeocoded = basecampCoords != null
 
   return (
@@ -397,7 +496,7 @@ export function CreateTrip() {
                     </Field>
                   </div>
 
-                  <Field label="Basecamp Address">
+                  <Field label="Basecamp Address" required>
                     <PlaceAutocomplete
                       value={basecampAddress}
                       placeholder="e.g. Jervis Bay, NSW 2540"
@@ -417,13 +516,29 @@ export function CreateTrip() {
                   </Field>
                 </div>
 
+                <div className="mt-4">
+                  <div className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-text-secondary">
+                    Select Basecamp on Map
+                  </div>
+                  <MiniMap 
+                    waypoints={basecampCoords ? [{ lat: basecampCoords.lat, lng: basecampCoords.lng, color: '#3FB950', isBasecamp: true }] : []}
+                    onMapClick={async (lng, lat) => {
+                      setBasecampCoords({ lat, lng })
+                      const res = await reverseGeocode(lng, lat)
+                      if (res) {
+                        setBasecampAddress(res.placeName)
+                      }
+                    }}
+                  />
+                </div>
+
                 <div className="mt-8 flex justify-end">
                   <button
                     onClick={() => setStep(2)}
-                    disabled={!title || !startDate || !endDate}
+                    disabled={!title || !startDate || !endDate || !basecampCoords}
                     className={cn(
                       'border px-6 py-2 text-[11px] font-black uppercase tracking-wider',
-                      title && startDate && endDate
+                      title && startDate && endDate && basecampCoords
                         ? 'border-info bg-info-soft text-info hover:bg-info/20'
                         : 'border-border-default bg-bg-panel text-text-muted cursor-not-allowed'
                     )}
@@ -483,7 +598,7 @@ export function CreateTrip() {
                           />
                           <PlaceAutocomplete
                             value={family.origin}
-                            placeholder="Origin city"
+                            placeholder="Origin city *"
                             onSelect={(place) => {
                               updateFamily(index, 'origin', place.placeName)
                               updateFamily(index, 'originLat', place.lat)
@@ -491,6 +606,11 @@ export function CreateTrip() {
                             }}
                           />
                         </div>
+                        {family.origin && family.originLat == null && (
+                          <div className="text-[10px] text-critical mt-1">
+                            ⚠️ Please select a valid location from the dropdown or click on the map.
+                          </div>
+                        )}
                         {family.originLat != null && (
                           <div className="flex items-center gap-1.5 text-[10px] text-success">
                             <MapPin size={11} />
@@ -499,6 +619,19 @@ export function CreateTrip() {
                             </span>
                           </div>
                         )}
+                        <div className="mt-2">
+                          <MiniMap 
+                            waypoints={family.originLat ? [{ lat: family.originLat, lng: family.originLng, color: '#58A6FF' }] : []}
+                            onMapClick={async (lng, lat) => {
+                              updateFamily(index, 'originLat', lat)
+                              updateFamily(index, 'originLng', lng)
+                              const res = await reverseGeocode(lng, lat)
+                              if (res) {
+                                updateFamily(index, 'origin', res.placeName)
+                              }
+                            }}
+                          />
+                        </div>
                         <div className="grid grid-cols-2 gap-3">
                           <input
                             type="text"
@@ -544,7 +677,13 @@ export function CreateTrip() {
                   </button>
                   <button
                     onClick={() => setStep(3)}
-                    className="border border-info bg-info-soft px-6 py-2 text-[11px] font-black uppercase tracking-wider text-info hover:bg-info/20"
+                    disabled={!allFamiliesGeocoded}
+                    className={cn(
+                      'border px-6 py-2 text-[11px] font-black uppercase tracking-wider',
+                      allFamiliesGeocoded
+                        ? 'border-info bg-info-soft text-info hover:bg-info/20'
+                        : 'border-border-default bg-bg-panel text-text-muted cursor-not-allowed'
+                    )}
                   >
                     Next: Route Planning
                   </button>
@@ -664,6 +803,33 @@ export function CreateTrip() {
                         <Plus size={11} />
                         Add Stop
                       </button>
+
+                      {originOk && basecampGeocoded && (
+                        <div className="mt-4">
+                          <div className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-text-secondary">
+                            Click Map to Add Stop
+                          </div>
+                          <MiniMap 
+                            waypoints={waypoints.map((wp, i) => ({
+                              ...wp,
+                              color: i === 0 ? '#3FB950' : i === waypoints.length - 1 ? '#58A6FF' : '#D29922',
+                              isBasecamp: i === waypoints.length - 1
+                            }))} 
+                            onMapClick={async (lng, lat) => {
+                              const res = await reverseGeocode(lng, lat)
+                              if (res) {
+                                setRoutePlans((prev) =>
+                                  prev.map((rp, i) =>
+                                    i === familyIndex
+                                      ? { stops: [...rp.stops, { name: res.placeName.split(',')[0], address: res.placeName, lat: res.lat, lng: res.lng }] }
+                                      : rp
+                                  )
+                                )
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   )
                 })}
